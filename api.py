@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import logging
+import main
 from main import generate_tldr
 from scraper import ArticleScraper
 from mastodon_client import post_to_mastodon
@@ -29,6 +30,7 @@ class PostMastodonRequest(BaseModel):
 class SummarizeResponse(BaseModel):
     summary: str
     url: str
+    model: Optional[str] = None
 
 @app.post("/api/summarize", response_model=SummarizeResponse)
 async def summarize(request: SummarizeRequest) -> SummarizeResponse:
@@ -43,7 +45,14 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
 
     if not raw_text or len(raw_text.strip()) < 50:
         logging.warning(f"Content too short or empty for URL: {request.url}")
-        raise HTTPException(status_code=400, detail="Could not find enough readable content at that URL.")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not find enough readable content at that URL. "
+                "The site may be behind a paywall or bot-protection (e.g. Cloudflare) "
+                "that blocks automated access."
+            ),
+        )
 
     tldr = generate_tldr(raw_text, limit=request.limit)
     if not tldr:
@@ -51,7 +60,8 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
 
     return SummarizeResponse(
         summary=tldr, 
-        url=request.url
+        url=request.url,
+        model=main.LAST_MODEL_USED,
     )
 
 @app.post("/api/mastodon")

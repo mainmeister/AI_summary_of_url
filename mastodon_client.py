@@ -26,16 +26,21 @@ def post_to_mastodon(text: str, url: str) -> bool:
         )
         
         # Mastodon character limit is usually 500.
-        # URLs are counted as a fixed number of characters (usually 23),
-        # but the API might still count raw length depending on the server/version.
-        # To be safe, we'll aim for a total length under 500.
-        
+        # Mastodon always counts every URL as a fixed 23 characters toward the
+        # limit, regardless of the URL's actual length. We mirror that here so a
+        # long URL doesn't unnecessarily eat into the summary budget.
+        MASTODON_URL_WEIGHT = 23
+
         footer = f"\n\nRead more: {url}"
+        # Effective length of the footer as Mastodon counts it: the static text
+        # plus a fixed 23 chars for the URL (instead of its raw character count).
+        footer_prefix = "\n\nRead more: "
+        footer_len = len(footer_prefix) + MASTODON_URL_WEIGHT
         max_total_len = 500
-        
-        if len(text) + len(footer) > max_total_len:
+
+        if len(text) + footer_len > max_total_len:
             # Truncate summary to fit, leaving room for footer
-            allowed_text_len = max_total_len - len(footer) - 3
+            allowed_text_len = max_total_len - footer_len - 3
             if allowed_text_len > 0:
                 # Try to find the last sentence boundary
                 truncated_text = text[:allowed_text_len]

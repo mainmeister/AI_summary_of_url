@@ -5,6 +5,10 @@ import logging
 import pyperclip
 import subprocess
 import re
+import time
+import json
+import urllib.request
+import urllib.error
 from typing import Optional
 from google import genai
 from google.genai import types
@@ -23,6 +27,16 @@ logging.basicConfig(
 
 # Retrieve API Key from environment variable
 API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Ollama local model configuration (used as a fallback when all Gemini
+# free-tier quotas are exhausted / all cloud models are unavailable).
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
+
+# Tracks which model actually produced the most recent successful generation.
+# It is updated by _call_gemini / _call_ollama and can be read by callers
+# (CLI, API) to report the model that was eventually used.
+LAST_MODEL_USED: Optional[str] = None
 
 if not API_KEY:
     logging.error("GEMINI_API_KEY not found in environment variables or .env file.")
@@ -70,24 +84,129 @@ def get_persona(limit: int) -> str:
 def _call_gemini(prompt: str, max_tokens: int = 4096) -> Optional[str]:
     """Low-level helper to call Gemini and robustly extract the response text."""
     client = genai.Client(api_key=API_KEY)
+    
+    # Try the latest model first, then fall back through several models.
+    # Each model has its own independent free-tier quota, so if one is
+    # rate-limited (429) or unavailable (503), the next one may still work.
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+    ]
+    
+    # Relaxed safety settings for technical content (e.g. shellcodes, backdoors)
+    safety_settings = [
+        types.SafetySetting(category=cat, threshold="BLOCK_NONE")
+        for cat in [
+            "HARM_CATEGORY_HATE_SPEECH",
+            "HARM_CATEGORY_HARASSMENT",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "HARM_CATEGORY_CIVIC_INTEGRITY",
+        ]
+    ]
+
+    for model_name in models_to_try:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=max_tokens,
+                        temperature=0.7,
+                        safety_settings=safety_settings,
+                    )
+                )
+                
+                try:
+                    text = (response.text or "").strip()
+                    if text:
+                        global LAST_MODEL_USED
+                        LAST_MODEL_USED = model_name
+                        return text
+                except Exception as e:
+                    logging.warning(f"Could not extract text from model {model_name} response: {e}")
+
+                # If no text returned, check finish reason
+                finish_reason = "UNKNOWN"
+                if response.candidates and response.candidates[0].finish_reason:
+                    finish_reason = response.candidates[0].finish_reason
+                
+                logging.warning(f"Model {model_name} (attempt {attempt+1}) returned no text. Finish reason: {finish_reason}")
+                
+                # If it's a safety or other non-transient issue, trying same model again likely won't help
+                if finish_reason in ["SAFETY", "OTHER"]:
+                    break
+                
+            except Exception as e:
+                error_str = str(e).upper()
+                # Quota exhausted (429): the daily/per-minute quota for this model
+                # will not recover within a few seconds, so don't waste retries here.
+                # Move on to the next model, which has an independent quota.
+                if any(x in error_str for x in ["429", "RESOURCE_EXHAUSTED", "EXHAUSTED"]):
+                    logging.warning(f"Model {model_name} quota exhausted (429). Falling back to next model. Error: {e}")
+                    break
+                # Retry on other transient errors (503 Service Unavailable, timeouts)
+                elif any(x in error_str for x in ["503", "UNAVAILABLE", "DEADLINE_EXCEEDED", "500", "INTERNAL"]):
+                    wait_time = (2 ** attempt) + 1
+                    logging.warning(f"Model {model_name} transient error (attempt {attempt+1}/{max_retries}). Retrying in {wait_time}s... Error: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logging.error(f"Gemini API call failed for model {model_name}: {e}")
+                    # Break to try next model or return None
+                    break
+    
+    # All Gemini models failed (e.g. every free-tier quota is exhausted).
+    # Fall back to a locally hosted Ollama model so summarization keeps working.
+    logging.warning("All Gemini models unavailable. Falling back to local Ollama model.")
+    return _call_ollama(prompt, max_tokens=max_tokens)
+
+
+def _call_ollama(prompt: str, max_tokens: int = 4096) -> Optional[str]:
+    """Fallback helper that generates text using a local Ollama model.
+
+    Uses Ollama's HTTP API (default http://localhost:11434) so no extra Python
+    dependency is required. Returns None if the local server/model is
+    unavailable or produces no text.
+    """
+    url = f"{OLLAMA_HOST}/api/generate"
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "num_predict": max_tokens,
+        },
+    }
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+    )
+
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                max_output_tokens=max_tokens,
-                temperature=0.7
-            )
+        with urllib.request.urlopen(request, timeout=300) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        text = (body.get("response") or "").strip()
+        if text:
+            logging.info(f"Successfully generated text using local Ollama model '{OLLAMA_MODEL}'.")
+            global LAST_MODEL_USED
+            LAST_MODEL_USED = f"ollama:{OLLAMA_MODEL}"
+            return text
+        logging.warning(f"Ollama model '{OLLAMA_MODEL}' returned no text.")
+        return None
+    except urllib.error.URLError as e:
+        logging.error(
+            f"Failed to reach Ollama at {OLLAMA_HOST}. Is 'ollama serve' running? Error: {e}"
         )
-        
-        return (response.text or "").strip()
+        return None
     except Exception as e:
-        if "API key expired" in str(e):
-            logging.error("Gemini API key has expired. Please renew your API key in the .env file.")
-        elif "INVALID_ARGUMENT" in str(e):
-            logging.error("Invalid argument to Gemini API. Check your model name or request parameters.")
-        else:
-            logging.exception("Gemini API call failed.")
+        logging.error(f"Ollama API call failed for model '{OLLAMA_MODEL}': {e}")
         return None
 
 
@@ -133,6 +252,10 @@ def generate_tldr(text: str, limit: int = 500) -> Optional[str]:
     if not text or len(text.strip()) < 50:
         logging.warning("Input text is too short to summarize.")
         return None
+
+    # Reset so LAST_MODEL_USED reflects only this generation run.
+    global LAST_MODEL_USED
+    LAST_MODEL_USED = None
 
     CHUNK_SIZE = 100000  # Large enough to handle most articles in a single pass
     persona = get_persona(limit)
@@ -227,6 +350,9 @@ def main() -> None:
     except Exception as e:
         logging.warning("Could not copy to clipboard: %s", e)
         print(f"\nTL;DR:\n{tldr}")
+
+    if LAST_MODEL_USED:
+        print(f"\nModel used: {LAST_MODEL_USED}")
 
     if args.mastodon:
         print("\n--- Posting to Mastodon...")

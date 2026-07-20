@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 interface SummarizeResponse {
   summary: string;
   url: string;
+  model?: string;
 }
 
 @Injectable({

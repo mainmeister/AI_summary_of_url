@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ApiService } from './api.service';
@@ -17,13 +17,31 @@ import { ApiService } from './api.service';
       <main>
         <div class="input-group">
           <input 
+            #urlInput
             type="text" 
             [(ngModel)]="url" 
             placeholder="Enter URL to summarize (e.g., https://example.com)" 
             [disabled]="loading"
+            (keyup.enter)="summarize()"
           >
           <button (click)="summarize()" [disabled]="loading || !url">
             {{ loading ? 'Summarizing...' : 'Summarize' }}
+          </button>
+          <button 
+            *ngIf="summary"
+            #mastodonButton
+            class="mastodon-btn" 
+            (click)="postToMastodon()" 
+            [disabled]="isPostingToMastodon || mastodonSuccess === true"
+          >
+            {{ isPostingToMastodon ? 'Posting...' : (mastodonSuccess === true ? 'Posted' : 'Post to Mastodon') }}
+          </button>
+          <button 
+            *ngIf="summary"
+            class="ok-btn"
+            (click)="reload()"
+          >
+            OK
           </button>
         </div>
 
@@ -46,17 +64,21 @@ import { ApiService } from './api.service';
         </div>
 
         <div *ngIf="summary" class="result">
-          <h3>Summary</h3>
-          <p>{{ summary }}</p>
+          <h3>Summary (Editable)</h3>
+          <textarea 
+            [(ngModel)]="summary" 
+            class="summary-edit"
+            rows="10"
+            placeholder="Edit the summary here before posting..."
+          ></textarea>
+          <div class="char-count">
+            {{ mastodonCharCount }} / 500 characters (incl. 23 for URL)
+          </div>
+          <div *ngIf="model" class="model-used">
+            Model used: <strong>{{ model }}</strong>
+          </div>
           <div class="meta">
             <small>URL: {{ lastUrl }}</small>
-            <button 
-              class="mastodon-btn" 
-              (click)="postToMastodon()" 
-              [disabled]="isPostingToMastodon || mastodonSuccess === true"
-            >
-              {{ isPostingToMastodon ? 'Posting...' : (mastodonSuccess === true ? 'Posted' : 'Post to Mastodon') }}
-            </button>
           </div>
           <div *ngIf="mastodonSuccess !== null" class="mastodon-status-bar" [class.success]="mastodonSuccess" [class.failure]="!mastodonSuccess">
             {{ mastodonSuccess ? '✓ Successfully posted to Mastodon' : '✗ Failed to post to Mastodon' }}
@@ -167,6 +189,38 @@ import { ApiService } from './api.service';
       line-height: 1.6;
       font-size: 17px;
     }
+    .summary-edit {
+      width: 100%;
+      min-height: 150px;
+      padding: 12px;
+      font-size: 16px;
+      line-height: 1.6;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+      background-color: white;
+    }
+    .summary-edit:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 5px rgba(52, 152, 219, 0.2);
+    }
+    .char-count {
+      margin-top: 6px;
+      text-align: right;
+      font-size: 13px;
+      color: #7f8c8d;
+    }
+    .model-used {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #34495e;
+    }
+    .model-used strong {
+      color: #2c3e50;
+    }
     .meta {
       margin-top: 15px;
       color: #7f8c8d;
@@ -184,6 +238,12 @@ import { ApiService } from './api.service';
     }
     .mastodon-btn:hover:not(:disabled) {
       background-color: #5657e5;
+    }
+    .ok-btn {
+      background-color: #27ae60;
+    }
+    .ok-btn:hover:not(:disabled) {
+      background-color: #219150;
     }
     .mastodon-status-bar {
       margin-top: 10px;
@@ -215,18 +275,37 @@ import { ApiService } from './api.service';
     }
   `],
 })
-export class AppComponent {
+export class AppComponent implements AfterViewInit {
+  @ViewChild('urlInput') urlInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('mastodonButton') mastodonButton?: ElementRef<HTMLButtonElement>;
+
   url = '';
   limit = 500;
   
   lastUrl = '';
   summary = '';
+  model = '';
   mastodonSuccess: boolean | null = null;
   loading = false;
   isPostingToMastodon = false;
   error = '';
 
+  // Mastodon always counts every URL as a fixed 23 characters, plus the
+  // "\n\nRead more: " footer prefix that is prepended to the URL when posting.
+  private static readonly MASTODON_URL_WEIGHT = 23;
+  private static readonly FOOTER_PREFIX = '\n\nRead more: ';
+
+  get mastodonCharCount(): number {
+    return this.summary.length
+      + AppComponent.FOOTER_PREFIX.length
+      + AppComponent.MASTODON_URL_WEIGHT;
+  }
+
   constructor(private apiService: ApiService) {}
+
+  ngAfterViewInit() {
+    this.urlInput?.nativeElement.focus();
+  }
 
   summarize() {
     if (!this.url) return;
@@ -234,19 +313,26 @@ export class AppComponent {
     this.loading = true;
     this.error = '';
     this.summary = '';
+    this.model = '';
     this.mastodonSuccess = null;
     
     this.apiService.summarize(this.url, this.limit).subscribe({
       next: (res) => {
         this.summary = res.summary;
         this.lastUrl = res.url;
+        this.model = res.model || '';
         this.loading = false;
+        setTimeout(() => this.mastodonButton?.nativeElement.focus());
       },
       error: (err) => {
         this.error = err.error?.detail || 'An unexpected error occurred. Please try again.';
         this.loading = false;
       }
     });
+  }
+
+  reload() {
+    window.location.reload();
   }
 
   postToMastodon() {
