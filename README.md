@@ -133,3 +133,7 @@ OLLAMA_MODEL=llama3.2:latest
 ```
 
 No extra Python dependency is required; the fallback talks to Ollama's HTTP API directly.
+
+## License
+
+This project is licensed under the terms of the **GNU General Public License v3.0 (or later)**. See the [LICENSE](LICENSE) file for the full license text.
