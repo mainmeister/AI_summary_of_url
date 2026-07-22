@@ -108,10 +108,24 @@ uv run main.py <URL> --mastodon
 - **Editable Summary**: The generated summary is shown in an editable text area (with a live Mastodon character count) so you can tweak it before posting.
 - **Post to Mastodon**: Once a summary is generated, post it (plus the source URL) to Mastodon directly from the UI; an **OK** button resets the page for the next URL.
 - **Model Transparency**: The UI displays which model actually produced the summary.
+- **Content Sanitization (Prompt-Injection Defense)**: Extracted web content is filtered against **indirect prompt injection** and **hidden text smuggling** (such as zero-opacity CSS, hidden HTML elements, HTML comments, or invisible Unicode tag characters) before it is ever sent to the AI.
 - **Technical Journalist Persona**: Summaries are objective, data-driven, and focused on key technical takeaways (Gemini 2.5 Flash).
 - **Long Article Support**: Uses a Map-Reduce strategy to handle long content.
 - **Model Fallback Chain**: Tries several Gemini models in turn (each has its own free-tier quota) before falling back locally.
 - **Local Model Fallback**: When all Gemini free-tier quotas are exhausted (or the Gemini API is unavailable), the bot automatically falls back to a locally hosted [Ollama](https://ollama.com) model so summarization keeps working.
+
+## Content Sanitization & Prompt-Injection Defense
+
+When extracting content from web pages to send to an AI, the pipeline is vulnerable to **indirect prompt injection** and **hidden text smuggling** — payloads that are invisible to a human reader but still readable by the model. To mitigate this, all scraped content is filtered before it reaches Gemini/Ollama.
+
+The filtering (implemented in `content_filter.py` and wired into `scraper.py`) covers both the CLI and the API entry points, and specifically neutralizes:
+
+- **Hidden HTML elements** — elements using `display:none`, `visibility:hidden`, `opacity:0`, off-screen positioning, or the `hidden`/`aria-hidden` attributes are stripped.
+- **HTML comments** (`<!-- ... -->`) — removed so instructions hidden in comments never reach the model.
+- **Invisible Unicode tag characters** — the `U+E0000`–`U+E007F` tag block, zero-width characters (ZWSP/ZWNJ/ZWJ/word-joiner/BOM), and bidirectional override controls are removed.
+- **Injection phrasing** — text is passed through the [`pytector`](https://pypi.org/project/pytector/) sanitization pipeline when available, and gracefully degrades to the built-in custom filters when it is not.
+
+As a defensive backstop, every prompt sent to the model wraps the untrusted content in explicit `<document_content>` delimiters with a fixed instruction to treat the text strictly as data and never follow any instructions found within it. The behavior is **clean-and-continue**: suspicious content is stripped and summarization proceeds on the cleaned text (it is never blocked).
 
 ## Ollama Fallback
 

@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 from crawlee.crawlers import PlaywrightCrawler, PlaywrightCrawlingContext
 from crawlee.storage_clients import MemoryStorageClient
 
+from content_filter import sanitize_text, strip_hidden_html
+
 # A realistic desktop browser User-Agent used for the plain-HTTP fallback so
 # sites that block obviously-automated clients still serve their content.
 _BROWSER_HEADERS = {
@@ -282,6 +284,10 @@ class ArticleScraper:
         for element in content.find_all(class_=lambda x: x and any(kw in x.lower() for kw in ['sidebar', 'ad-', 'advert', 'social-share'])):
             element.decompose()
 
+        # Strip hidden/invisible HTML (display:none, aria-hidden, comments, etc.)
+        # so smuggled prompt-injection payloads never reach get_text().
+        strip_hidden_html(content)
+
         text = content.get_text(separator=' ', strip=True)
         
         if not text and content.name != 'body':
@@ -290,15 +296,22 @@ class ArticleScraper:
             if body:
                 for element in body(["script", "style", "nav", "footer", "header", "aside"]):
                     element.decompose()
+                strip_hidden_html(body)
                 text = body.get_text(separator=' ', strip=True)
+
+        # Sanitize the extracted body text (invisible Unicode + injection
+        # cleaning) before any truncation happens in scrape().
+        text = sanitize_text(text)
 
         # If the visible body yielded little readable text (paywall,
         # client-side rendering, or an anti-bot block page), fall back to the
         # abstract / description captured from the page metadata when it is
         # richer than what we managed to extract from the body.
         needs_fallback = len(text) < 200 or _looks_like_block_page(text)
-        if metadata_text and needs_fallback and len(metadata_text) > len(text):
-            logging.info("Using metadata abstract/description as content fallback.")
-            return metadata_text
+        if metadata_text and needs_fallback:
+            metadata_text = sanitize_text(metadata_text)
+            if len(metadata_text) > len(text):
+                logging.info("Using metadata abstract/description as content fallback.")
+                return metadata_text
 
         return text

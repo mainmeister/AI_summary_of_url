@@ -12,6 +12,7 @@ dependencies = [
     "google-genai>=1.61.0",
     "mastodon-py>=2.2.1",
     "pyperclip>=1.11.0",
+    "pytector>=0.3.2",
     "python-dotenv>=1.2.1",
     "uvicorn>=0.48.0",
 ]
