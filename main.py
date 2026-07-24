@@ -329,6 +329,9 @@ def main() -> None:
     parser.add_argument("--sublime", "-s", action="store_true", help="Open the result in Sublime Text")
     parser.add_argument("--limit", "-l", type=int, default=500, help="Maximum character limit for the summary (default: 500)")
     parser.add_argument("--mastodon", "-m", action="store_true", help="Post the summary and URL to Mastodon")
+    parser.add_argument("--no-strip-hidden", action="store_false", dest="strip_hidden", help="Disable stripping hidden HTML elements")
+    parser.add_argument("--no-strip-unicode", action="store_false", dest="strip_unicode", help="Disable stripping invisible Unicode")
+    parser.add_argument("--no-pytector", action="store_false", dest="use_pytector", help="Disable pytector sanitization")
     args = parser.parse_args()
 
     url = args.url
@@ -339,8 +342,11 @@ def main() -> None:
         print("Error: No URL provided.")
         return
 
-    logging.info("--- Extracting content...")
-    scraper = ArticleScraper()
+    scraper = ArticleScraper(
+        strip_hidden=args.strip_hidden,
+        strip_unicode=args.strip_unicode,
+        use_pytector=args.use_pytector
+    )
     try:
         raw_text = scraper.scrape_sync(url)
     except Exception:

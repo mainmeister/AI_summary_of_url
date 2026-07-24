@@ -28,29 +28,24 @@ _ZERO_WIDTH = frozenset({0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF})
 _HIDDEN_STYLE_RE = re.compile(
     r"(display\s*:\s*none)"
     r"|(visibility\s*:\s*hidden)"
-    r"|(opacity\s*:\s*0(?:\.0+)?\b)"
-    r"|(text-indent\s*:\s*-\d)"
-    r"|(left\s*:\s*-\d{3,})"
-    r"|(width\s*:\s*0(?:px)?\b)"
-    r"|(height\s*:\s*0(?:px)?\b)",
+    r"|(opacity\s*:\s*0(?:\.0+)?\b)",
     re.IGNORECASE,
 )
 
 
-def strip_hidden_html(node) -> None:
+def strip_hidden_html(node, enabled: bool = True) -> None:
     """Remove visually-hidden content and HTML comments from a soup ``node``.
 
     Operates in-place on a BeautifulSoup element. Decomposes:
     - HTML comments (which the browser never renders but scrapers pick up);
-    - elements carrying ``hidden`` or ``aria-hidden`` attributes;
+    - elements carrying the ``hidden`` attribute;
     - elements whose inline ``style`` matches a hidden signature
-      (``display:none``, ``visibility:hidden``, ``opacity:0`` or off-screen
-      positioning).
+      (``display:none``, ``visibility:hidden``, ``opacity:0``).
 
     Never raises: any unexpected error is logged and swallowed so scraping can
     continue on the un-stripped node.
     """
-    if node is None:
+    if node is None or not enabled:
         return
     try:
         removed = 0
@@ -60,11 +55,8 @@ def strip_hidden_html(node) -> None:
             comment.extract()
             removed += 1
 
-        # 2) Elements explicitly marked hidden / aria-hidden.
+        # 2) Elements explicitly marked hidden.
         for element in node.find_all(attrs={"hidden": True}):
-            element.decompose()
-            removed += 1
-        for element in node.find_all(attrs={"aria-hidden": "true"}):
             element.decompose()
             removed += 1
 
@@ -84,14 +76,14 @@ def strip_hidden_html(node) -> None:
         logger.warning("strip_hidden_html failed; leaving node unmodified.", exc_info=True)
 
 
-def strip_invisible_unicode(text: str) -> str:
+def strip_invisible_unicode(text: str, enabled: bool = True) -> str:
     """Remove invisible Unicode smuggling characters from ``text``.
 
     Strips the Unicode tag block (``U+E0000``-``U+E007F``), zero-width
     characters (ZWSP/ZWNJ/ZWJ/word-joiner/BOM) and bidirectional override
     controls (``U+202A``-``U+202E``). Visible characters are preserved.
     """
-    if not text:
+    if not text or not enabled:
         return text
     cleaned = "".join(
         c
@@ -129,7 +121,7 @@ def _pytector_sanitize(text: str) -> str:
         return text
 
 
-def sanitize_text(text: str) -> str:
+def sanitize_text(text: str, strip_unicode: bool = True, use_pytector: bool = True) -> str:
     """Clean extracted text before it is sent to the AI.
 
     Pipeline: strip invisible Unicode -> pytector injection cleaning (best
@@ -140,8 +132,9 @@ def sanitize_text(text: str) -> str:
         return text
     try:
         original = text
-        text = strip_invisible_unicode(text)
-        text = _pytector_sanitize(text)
+        text = strip_invisible_unicode(text, enabled=strip_unicode)
+        if use_pytector:
+            text = _pytector_sanitize(text)
         # Normalize whitespace (collapse runs, trim edges).
         text = re.sub(r"[ \t\f\v]+", " ", text)
         text = re.sub(r"\s*\n\s*", "\n", text)

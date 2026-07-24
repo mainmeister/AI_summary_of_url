@@ -35,7 +35,9 @@ _BLOCK_PAGE_SIGNATURES = (
     "attention required! | cloudflare",
     "checking your browser before accessing",
     "please enable javascript and cookies to continue",
+    "enable javascript and cookies to continue",
     "verify you are human",
+    "just a moment...",
     "access to this page has been denied",
     "request unsuccessful. incapsula",
     "reference number:",
@@ -54,7 +56,7 @@ def _looks_like_block_page(text: str) -> bool:
     lowered = text.lower()
     if any(sig in lowered for sig in _BLOCK_PAGE_SIGNATURES):
         # Real articles are long; block/challenge pages are short.
-        return len(text) < 1200
+        return len(text) < 10000
     return False
 
 # Reduce Crawlee logging noise
@@ -63,9 +65,19 @@ logging.getLogger('crawlee').setLevel(logging.WARNING)
 class ArticleScraper:
     """A dedicated class for web scraping and content extraction using Crawlee."""
 
-    def __init__(self, timeout: int = 45, max_chars: int = 100000) -> None:
+    def __init__(
+        self, 
+        timeout: int = 90, 
+        max_chars: int = 100000,
+        strip_hidden: bool = True,
+        strip_unicode: bool = True,
+        use_pytector: bool = True
+    ) -> None:
         self.timeout = timeout
         self.max_chars = max_chars
+        self.strip_hidden = strip_hidden
+        self.strip_unicode = strip_unicode
+        self.use_pytector = use_pytector
 
     async def scrape(self, url: str) -> str:
         """Asynchronous implementation of scraping using PlaywrightCrawler."""
@@ -286,7 +298,7 @@ class ArticleScraper:
 
         # Strip hidden/invisible HTML (display:none, aria-hidden, comments, etc.)
         # so smuggled prompt-injection payloads never reach get_text().
-        strip_hidden_html(content)
+        strip_hidden_html(content, enabled=self.strip_hidden)
 
         text = content.get_text(separator=' ', strip=True)
         
@@ -296,12 +308,16 @@ class ArticleScraper:
             if body:
                 for element in body(["script", "style", "nav", "footer", "header", "aside"]):
                     element.decompose()
-                strip_hidden_html(body)
+                strip_hidden_html(body, enabled=self.strip_hidden)
                 text = body.get_text(separator=' ', strip=True)
 
         # Sanitize the extracted body text (invisible Unicode + injection
         # cleaning) before any truncation happens in scrape().
-        text = sanitize_text(text)
+        text = sanitize_text(
+            text, 
+            strip_unicode=self.strip_unicode, 
+            use_pytector=self.use_pytector
+        )
 
         # If the visible body yielded little readable text (paywall,
         # client-side rendering, or an anti-bot block page), fall back to the
@@ -309,7 +325,11 @@ class ArticleScraper:
         # richer than what we managed to extract from the body.
         needs_fallback = len(text) < 200 or _looks_like_block_page(text)
         if metadata_text and needs_fallback:
-            metadata_text = sanitize_text(metadata_text)
+            metadata_text = sanitize_text(
+                metadata_text, 
+                strip_unicode=self.strip_unicode, 
+                use_pytector=self.use_pytector
+            )
             if len(metadata_text) > len(text):
                 logging.info("Using metadata abstract/description as content fallback.")
                 return metadata_text

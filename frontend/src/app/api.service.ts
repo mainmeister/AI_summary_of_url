@@ -16,8 +16,20 @@ export class ApiService {
 
   constructor(private http: HttpClient) { }
 
-  summarize(url: string, limit: number = 500): Observable<SummarizeResponse> {
-    return this.http.post<SummarizeResponse>(`${this.apiUrl}/summarize`, { url, limit });
+  summarize(
+    url: string, 
+    limit: number = 500, 
+    stripHidden: boolean = true, 
+    stripUnicode: boolean = true, 
+    usePytector: boolean = true
+  ): Observable<SummarizeResponse> {
+    return this.http.post<SummarizeResponse>(`${this.apiUrl}/summarize`, { 
+      url, 
+      limit,
+      strip_hidden: stripHidden,
+      strip_unicode: stripUnicode,
+      use_pytector: usePytector
+    });
   }
 
   postToMastodon(summary: string, url: string): Observable<{ success: boolean }> {

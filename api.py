@@ -22,6 +22,9 @@ app.add_middleware(
 class SummarizeRequest(BaseModel):
     url: str
     limit: int = 500
+    strip_hidden: bool = True
+    strip_unicode: bool = True
+    use_pytector: bool = True
 
 class PostMastodonRequest(BaseModel):
     summary: str
@@ -36,7 +39,11 @@ class SummarizeResponse(BaseModel):
 async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     logging.info(f"Received request to summarize: {request.url} (limit: {request.limit})")
     
-    scraper = ArticleScraper()
+    scraper = ArticleScraper(
+        strip_hidden=request.strip_hidden,
+        strip_unicode=request.strip_unicode,
+        use_pytector=request.use_pytector
+    )
     try:
         raw_text = await scraper.scrape(request.url)
     except Exception as e:

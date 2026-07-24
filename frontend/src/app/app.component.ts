@@ -57,6 +57,17 @@ import { ApiService } from './api.service';
               max="2000"
             >
           </div>
+          <div class="option">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="stripHidden" [disabled]="loading"> Strip Hidden HTML
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="stripUnicode" [disabled]="loading"> Strip Invisible Unicode
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="usePytector" [disabled]="loading"> Use Pytector
+            </label>
+          </div>
         </div>
 
         <div *ngIf="error" class="error">
@@ -281,6 +292,9 @@ export class AppComponent implements AfterViewInit {
 
   url = '';
   limit = 500;
+  stripHidden = true;
+  stripUnicode = true;
+  usePytector = true;
   
   lastUrl = '';
   summary = '';
@@ -316,7 +330,13 @@ export class AppComponent implements AfterViewInit {
     this.model = '';
     this.mastodonSuccess = null;
     
-    this.apiService.summarize(this.url, this.limit).subscribe({
+    this.apiService.summarize(
+      this.url, 
+      this.limit, 
+      this.stripHidden, 
+      this.stripUnicode, 
+      this.usePytector
+    ).subscribe({
       next: (res) => {
         this.summary = res.summary;
         this.lastUrl = res.url;

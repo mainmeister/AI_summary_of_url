@@ -96,6 +96,9 @@ uv run main.py <URL> --limit 300
 
 # Post the summary and URL to Mastodon
 uv run main.py <URL> --mastodon
+
+# Disable specific content sanitization
+uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector
 ```
 
 *Important: Ensure there is a space between `main.py` and the URL.*
@@ -108,7 +111,7 @@ uv run main.py <URL> --mastodon
 - **Editable Summary**: The generated summary is shown in an editable text area (with a live Mastodon character count) so you can tweak it before posting.
 - **Post to Mastodon**: Once a summary is generated, post it (plus the source URL) to Mastodon directly from the UI; an **OK** button resets the page for the next URL.
 - **Model Transparency**: The UI displays which model actually produced the summary.
-- **Content Sanitization (Prompt-Injection Defense)**: Extracted web content is filtered against **indirect prompt injection** and **hidden text smuggling** (such as zero-opacity CSS, hidden HTML elements, HTML comments, or invisible Unicode tag characters) before it is ever sent to the AI.
+- **Content Sanitization (Prompt-Injection Defense)**: Extracted web content is filtered against **indirect prompt injection** and **hidden text smuggling** (such as zero-opacity CSS, hidden HTML elements, HTML comments, or invisible Unicode tag characters) before it is ever sent to the AI. These settings are configurable via the web UI or CLI.
 - **Technical Journalist Persona**: Summaries are objective, data-driven, and focused on key technical takeaways (Gemini 2.5 Flash).
 - **Long Article Support**: Uses a Map-Reduce strategy to handle long content.
 - **Model Fallback Chain**: Tries several Gemini models in turn (each has its own free-tier quota) before falling back locally.
