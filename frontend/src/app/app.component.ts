@@ -60,9 +60,11 @@ import { ApiService } from './api.service';
           <div class="option">
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="stripHidden" [disabled]="loading"> Strip Hidden HTML
+              <a href="https://www.google.com/search?q=Strip+Hidden+HTML" target="_blank" title="Strip Hidden HTML search" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="stripUnicode" [disabled]="loading"> Strip Invisible Unicode
+              <a href="https://www.google.com/search?q=Strip+Invisible+Unicode" target="_blank" title="Strip Invisible Unicode search" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="usePytector" [disabled]="loading"> Use Pytector
