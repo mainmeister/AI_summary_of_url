@@ -66,6 +66,7 @@ import { ApiService } from './api.service';
             </label>
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="usePytector" [disabled]="loading"> Use Pytector
+              <a href="https://pytector.readthedocs.io/en/latest/quickstart.html" target="_blank" title="Pytector Quickstart" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
           </div>
         </div>
