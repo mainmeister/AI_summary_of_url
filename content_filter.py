@@ -55,8 +55,11 @@ def strip_hidden_html(node, enabled: bool = True) -> None:
             comment.extract()
             removed += 1
 
-        # 2) Elements explicitly marked hidden.
+        # 2) Elements explicitly marked hidden or aria-hidden.
         for element in node.find_all(attrs={"hidden": True}):
+            element.decompose()
+            removed += 1
+        for element in node.find_all(attrs={"aria-hidden": lambda v: bool(v) and str(v).lower() in ("true", "1")}):
             element.decompose()
             removed += 1
 

@@ -332,6 +332,7 @@ def main() -> None:
     parser.add_argument("--no-strip-hidden", action="store_false", dest="strip_hidden", help="Disable stripping hidden HTML elements")
     parser.add_argument("--no-strip-unicode", action="store_false", dest="strip_unicode", help="Disable stripping invisible Unicode")
     parser.add_argument("--no-pytector", action="store_false", dest="use_pytector", help="Disable pytector sanitization")
+    parser.add_argument("--no-strip-query", action="store_false", dest="strip_query", help="Disable stripping query parameters")
     args = parser.parse_args()
 
     url = args.url
@@ -345,8 +346,12 @@ def main() -> None:
     scraper = ArticleScraper(
         strip_hidden=args.strip_hidden,
         strip_unicode=args.strip_unicode,
-        use_pytector=args.use_pytector
+        use_pytector=args.use_pytector,
+        strip_query=args.strip_query
     )
+    if args.strip_query:
+        url = url.split('?')[0]
+    
     try:
         raw_text = scraper.scrape_sync(url)
     except Exception:

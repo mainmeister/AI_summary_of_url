@@ -10,10 +10,10 @@ from mastodon_client import post_to_mastodon
 
 app = FastAPI()
 
-# Enable CORS for Angular development server
+# Enable CORS for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,6 +25,7 @@ class SummarizeRequest(BaseModel):
     strip_hidden: bool = True
     strip_unicode: bool = True
     use_pytector: bool = True
+    strip_query: bool = True
 
 class PostMastodonRequest(BaseModel):
     summary: str
@@ -42,7 +43,8 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     scraper = ArticleScraper(
         strip_hidden=request.strip_hidden,
         strip_unicode=request.strip_unicode,
-        use_pytector=request.use_pytector
+        use_pytector=request.use_pytector,
+        strip_query=request.strip_query
     )
     try:
         raw_text = await scraper.scrape(request.url)
@@ -65,9 +67,13 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
     if not tldr:
         raise HTTPException(status_code=500, detail="Failed to generate TL;DR.")
 
+    url_to_return = request.url
+    if request.strip_query:
+        url_to_return = url_to_return.split('?')[0]
+
     return SummarizeResponse(
         summary=tldr, 
-        url=request.url,
+        url=url_to_return,
         model=main.LAST_MODEL_USED,
     )
 

@@ -71,16 +71,22 @@ class ArticleScraper:
         max_chars: int = 100000,
         strip_hidden: bool = True,
         strip_unicode: bool = True,
-        use_pytector: bool = True
+        use_pytector: bool = True,
+        strip_query: bool = True
     ) -> None:
         self.timeout = timeout
         self.max_chars = max_chars
         self.strip_hidden = strip_hidden
         self.strip_unicode = strip_unicode
         self.use_pytector = use_pytector
+        self.strip_query = strip_query
 
     async def scrape(self, url: str) -> str:
         """Asynchronous implementation of scraping using PlaywrightCrawler."""
+        # Strip query parameters (everything after and including '?')
+        if self.strip_query:
+            url = url.split('?')[0]
+        
         extracted_text = ""
         
         # Google News needs a more thorough wait to trigger the JS redirect

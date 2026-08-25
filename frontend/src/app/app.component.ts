@@ -70,6 +70,9 @@ import { ApiService } from './api.service';
               <input type="checkbox" [(ngModel)]="usePytector" [disabled]="loading"> Use Pytector
               <a href="https://pytector.readthedocs.io/en/latest/quickstart.html" target="_blank" title="Pytector Quickstart" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="stripQuery" [disabled]="loading"> Strip Query Params
+            </label>
           </div>
         </div>
 
@@ -298,6 +301,7 @@ export class AppComponent implements AfterViewInit {
   stripHidden = true;
   stripUnicode = true;
   usePytector = true;
+  stripQuery = true;
   
   lastUrl = '';
   summary = '';
@@ -338,11 +342,13 @@ export class AppComponent implements AfterViewInit {
       this.limit, 
       this.stripHidden, 
       this.stripUnicode, 
-      this.usePytector
+      this.usePytector,
+      this.stripQuery
     ).subscribe({
       next: (res) => {
         this.summary = res.summary;
         this.lastUrl = res.url;
+        this.url = res.url; // Update input field with the returned URL (possibly stripped)
         this.model = res.model || '';
         this.loading = false;
         setTimeout(() => this.mastodonButton?.nativeElement.focus());

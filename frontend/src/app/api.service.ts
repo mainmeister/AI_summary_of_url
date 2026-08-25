@@ -12,7 +12,8 @@ interface SummarizeResponse {
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl = 'http://localhost:8000/api';
+  // Dynamically use the current host's IP/hostname
+  private apiUrl = `http://${window.location.hostname}:8000/api`;
 
   constructor(private http: HttpClient) { }
 
@@ -21,14 +22,16 @@ export class ApiService {
     limit: number = 500, 
     stripHidden: boolean = true, 
     stripUnicode: boolean = true, 
-    usePytector: boolean = true
+    usePytector: boolean = true,
+    stripQuery: boolean = true
   ): Observable<SummarizeResponse> {
     return this.http.post<SummarizeResponse>(`${this.apiUrl}/summarize`, { 
       url, 
       limit,
       strip_hidden: stripHidden,
       strip_unicode: stripUnicode,
-      use_pytector: usePytector
+      use_pytector: usePytector,
+      strip_query: stripQuery
     });
   }
 
