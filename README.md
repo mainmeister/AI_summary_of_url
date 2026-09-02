@@ -1,6 +1,6 @@
-# TL;DR URL Bot - Web UI & CLI
+# TL;DR URL Bot - Web UI, Chrome Extension & CLI
 
-An AI-powered URL summarizer that extracts web articles, sanitizes content against indirect prompt injections, and generates concise, high-density summaries using Google Gemini models with an automatic local Ollama fallback. Includes both an Angular web interface and a command-line interface (CLI).
+An AI-powered URL summarizer that extracts web articles, sanitizes content against indirect prompt injections, and generates concise, high-density summaries using Google Gemini models with an automatic local Ollama fallback. Includes an Angular web interface, a Chrome browser extension, and a command-line interface (CLI).
 
 ## Prerequisites
 
@@ -119,6 +119,17 @@ npm start
 
 The Angular app will be available at `http://localhost:4200` (served on `0.0.0.0` for local and LAN access).
 
+### 3. Chrome Extension
+
+The Chrome extension duplicates the entire web UI into a browser popup with automatic active-tab URL detection.
+
+1. Open `chrome://extensions/` in your Chrome or Chromium-based browser.
+2. Enable **Developer mode** (toggle in the top-right).
+3. Click **Load unpacked** and select the `extension` folder in this repository.
+4. Click the extension icon in your browser toolbar to summarize the current active tab or any entered URL.
+
+*Note: By default, the extension connects to `http://localhost:8000/api`. If you run the API on a custom host/port, click **⚙ Server URL** in the popup to configure it.*
+
 ## CLI Usage
 
 You can also use the tool directly from your terminal:
@@ -152,7 +163,7 @@ uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-str
 
 ## Features
 
-- **Web Interface**: Clean, responsive UI built with Angular standalone components.
+- **Web Interface & Chrome Extension**: Clean, responsive UI built with Angular standalone components and duplicated in a dedicated Chrome extension (Manifest V3) for seamless in-browser summarizing.
 - **Real-time Summarization**: Enter a URL and get an AI-generated summary in seconds.
 - **Keyboard Friendly**: The URL input is focused automatically on page load, and pressing **Enter** submits the URL.
 - **Editable Summary**: The generated summary is displayed in an editable textarea with a live character count (accounting for Mastodon's 23-character URL weight) so you can tweak the text before sharing.

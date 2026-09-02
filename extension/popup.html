@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TL;DR URL Bot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>TL;DR URL Bot</h1>
+      <p>Get concise, technical summaries of any webpage.</p>
+    </header>
+
+    <main>
+      <div class="input-group">
+        <input 
+          id="urlInput"
+          type="text" 
+          placeholder="Enter URL to summarize (e.g., https://example.com)" 
+          autofocus
+        >
+        <button id="summarizeBtn" disabled>
+          Summarize
+        </button>
+        <button 
+          id="mastodonBtn"
+          class="mastodon-btn hidden"
+        >
+          Post to Mastodon
+        </button>
+        <button 
+          id="okBtn"
+          class="ok-btn hidden"
+        >
+          OK
+        </button>
+      </div>
+
+      <div class="options-group">
+        <div class="option">
+          <label for="limit">Character Limit:</label>
+          <input 
+            id="limit" 
+            type="number" 
+            value="500"
+            min="100" 
+            max="2000"
+          >
+        </div>
+        <div class="option checkbox-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="stripHidden" checked> Strip Hidden HTML
+            <a href="https://www.google.com/search?q=Strip+Hidden+HTML" target="_blank" rel="noopener noreferrer" title="Strip Hidden HTML search" class="help-link">(?)</a>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="stripUnicode" checked> Strip Invisible Unicode
+            <a href="https://www.google.com/search?q=Strip+Invisible+Unicode" target="_blank" rel="noopener noreferrer" title="Strip Invisible Unicode search" class="help-link">(?)</a>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="usePytector" checked> Use Pytector
+            <a href="https://pytector.readthedocs.io/en/latest/quickstart.html" target="_blank" rel="noopener noreferrer" title="Pytector Quickstart" class="help-link">(?)</a>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="stripQuery" checked> Strip Query Params
+          </label>
+        </div>
+      </div>
+
+      <div class="server-config">
+        <button type="button" id="toggleServerConfigBtn" class="toggle-config-btn" title="Configure Backend API Server">⚙ Server URL</button>
+        <div id="serverConfigPanel" class="server-config-panel hidden">
+          <label for="apiUrlInput">Backend API URL:</label>
+          <div class="server-input-row">
+            <input id="apiUrlInput" type="text" value="http://localhost:8000/api" placeholder="http://localhost:8000/api">
+            <button type="button" id="saveApiUrlBtn" class="save-config-btn">Save</button>
+          </div>
+          <small class="server-config-hint">Default is http://localhost:8000/api</small>
+        </div>
+      </div>
+
+      <div id="errorContainer" class="error hidden"></div>
+
+      <div id="resultContainer" class="result hidden">
+        <h3>Summary (Editable)</h3>
+        <textarea 
+          id="summaryEdit"
+          class="summary-edit" 
+          rows="10"
+          placeholder="Edit the summary here before posting..."
+        ></textarea>
+        <div id="charCount" class="char-count">
+          36 / 500 characters (incl. 23 for URL)
+        </div>
+        <div id="modelContainer" class="model-used hidden">
+          Model used: <strong id="modelName"></strong>
+        </div>
+        <div class="meta">
+          <small id="urlMeta">URL: </small>
+        </div>
+        <div id="mastodonStatusBar" class="mastodon-status-bar hidden"></div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Powered by Gemini 2.0 Flash</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

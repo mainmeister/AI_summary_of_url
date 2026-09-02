@@ -1,0 +1,331 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff;
+  min-width: 580px;
+  max-width: 650px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+.container {
+  padding: 16px 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  color: #2c3e50;
+  margin: 0 0 6px 0;
+  font-size: 22px;
+}
+
+header p {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+}
+
+input[type="text"]:focus {
+  border-color: #3498db;
+}
+
+button {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+button:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.mastodon-btn {
+  background-color: #6364ff;
+  padding: 10px 14px;
+}
+
+.mastodon-btn:hover:not(:disabled) {
+  background-color: #5657e5;
+}
+
+.ok-btn {
+  background-color: #27ae60;
+  padding: 10px 14px;
+}
+
+.ok-btn:hover:not(:disabled) {
+  background-color: #219150;
+}
+
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: #f0f4f8;
+  padding: 12px 14px;
+  border-radius: 6px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.option label {
+  font-weight: 600;
+  color: #34495e;
+  font-size: 13px;
+}
+
+.option input[type="number"] {
+  width: 75px;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.checkbox-label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal !important;
+  font-size: 13px;
+  color: #333;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.help-link {
+  font-size: 11px;
+  color: #3498db;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.help-link:hover {
+  text-decoration: underline;
+}
+
+.server-config {
+  margin-bottom: 14px;
+}
+
+.toggle-config-btn {
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.toggle-config-btn:hover {
+  color: #34495e;
+  background: none;
+}
+
+.server-config-panel {
+  margin-top: 6px;
+  background: #fafbfc;
+  border: 1px dashed #ccd1d9;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.server-config-panel label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.server-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.server-input-row input {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.save-config-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  background-color: #34495e;
+}
+
+.save-config-btn:hover:not(:disabled) {
+  background-color: #2c3e50;
+}
+
+.server-config-hint {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.error {
+  color: #e74c3c;
+  padding: 10px 12px;
+  background-color: #fadbd8;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.result {
+  margin-top: 16px;
+  padding: 14px;
+  background-color: #f9f9f9;
+  border-left: 5px solid #3498db;
+  border-radius: 4px;
+}
+
+.result h3 {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.summary-edit {
+  width: 100%;
+  min-height: 140px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  background-color: white;
+}
+
+.summary-edit:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.2);
+}
+
+.char-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.model-used {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #34495e;
+}
+
+.model-used strong {
+  color: #2c3e50;
+}
+
+.meta {
+  margin-top: 10px;
+  color: #7f8c8d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 8px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.mastodon-status-bar {
+  margin-top: 8px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mastodon-status-bar.success {
+  color: #27ae60;
+  background-color: #eafaf1;
+}
+
+.mastodon-status-bar.failure {
+  color: #c0392b;
+  background-color: #fdecea;
+}
+
+footer {
+  margin-top: 24px;
+  text-align: center;
+  color: #95a5a6;
+  font-size: 12px;
+}
+
+.hidden {
+  display: none !important;
+}
