@@ -64,6 +64,11 @@
           </label>
           <label class="checkbox-label">
             <input type="checkbox" id="stripQuery" checked> Strip Query Params
+            <a href="https://www.google.com/search?q=Strip+Query+Params" target="_blank" rel="noopener noreferrer" title="Strip Query Params search" class="help-link">(?)</a>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="forceOllama"> Force Ollama
+            <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" title="Ollama" class="help-link">(?)</a>
           </label>
         </div>
       </div>
@@ -95,6 +100,10 @@
         </div>
         <div id="modelContainer" class="model-used hidden">
           Model used: <strong id="modelName"></strong>
+          <span id="durationSpan" class="hidden"> (took <span id="durationTime"></span>s)</span>
+        </div>
+        <div id="standaloneDurationContainer" class="model-used hidden">
+          Time taken: <strong id="standaloneDurationTime"></strong>
         </div>
         <div class="meta">
           <small id="urlMeta">URL: </small>

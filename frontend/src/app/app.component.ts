@@ -72,6 +72,11 @@ import { ApiService } from './api.service';
             </label>
             <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="stripQuery" [disabled]="loading"> Strip Query Params
+              <a href="https://www.google.com/search?q=Strip+Query+Params" target="_blank" title="Strip Query Params search" style="font-size: 12px; margin-left: 5px;">(?)</a>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="forceOllama" [disabled]="loading"> Force Ollama
+              <a href="https://ollama.com" target="_blank" title="Ollama" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
           </div>
         </div>
@@ -93,6 +98,10 @@ import { ApiService } from './api.service';
           </div>
           <div *ngIf="model" class="model-used">
             Model used: <strong>{{ model }}</strong>
+            <span *ngIf="duration !== null"> (took {{ duration }}s)</span>
+          </div>
+          <div *ngIf="!model && duration !== null" class="model-used">
+            Time taken: <strong>{{ duration }}s</strong>
           </div>
           <div class="meta">
             <small>URL: {{ lastUrl }}</small>
@@ -302,10 +311,12 @@ export class AppComponent implements AfterViewInit {
   stripUnicode = true;
   usePytector = true;
   stripQuery = true;
+  forceOllama = false;
   
   lastUrl = '';
   summary = '';
   model = '';
+  duration: number | null = null;
   mastodonSuccess: boolean | null = null;
   loading = false;
   isPostingToMastodon = false;
@@ -335,6 +346,7 @@ export class AppComponent implements AfterViewInit {
     this.error = '';
     this.summary = '';
     this.model = '';
+    this.duration = null;
     this.mastodonSuccess = null;
     
     this.apiService.summarize(
@@ -343,13 +355,15 @@ export class AppComponent implements AfterViewInit {
       this.stripHidden, 
       this.stripUnicode, 
       this.usePytector,
-      this.stripQuery
+      this.stripQuery,
+      this.forceOllama
     ).subscribe({
       next: (res) => {
         this.summary = res.summary;
         this.lastUrl = res.url;
         this.url = res.url; // Update input field with the returned URL (possibly stripped)
         this.model = res.model || '';
+        this.duration = res.duration !== undefined && res.duration !== null ? res.duration : null;
         this.loading = false;
         setTimeout(() => this.mastodonButton?.nativeElement.focus());
       },

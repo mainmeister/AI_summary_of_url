@@ -94,11 +94,12 @@ The backend exposes two endpoints:
     "strip_hidden": true,
     "strip_unicode": true,
     "use_pytector": true,
-    "strip_query": true
+    "strip_query": true,
+    "force_ollama": false
   }
   ```
   *(All fields except `url` are optional with sensible defaults)*.  
-  Returns `{ "summary": "...", "url": "...", "model": "gemini-2.5-flash" }`.
+  Returns `{ "summary": "...", "url": "...", "model": "gemini-2.5-flash", "duration": 1.42 }`.
 
 - `POST /api/mastodon` — Request body: `{ "summary": "...", "url": "..." }`.  
   Returns `{ "success": true }`.
@@ -153,6 +154,11 @@ uv run main.py <URL> --sublime
 # Shorthand:
 uv run main.py <URL> -s
 
+# Force using local Ollama model instead of Gemini
+uv run main.py <URL> --force-ollama
+# Shorthand:
+uv run main.py <URL> -o
+
 # Disable specific content sanitization options
 uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-strip-query
 ```
@@ -169,7 +175,7 @@ uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-str
 - **Editable Summary**: The generated summary is displayed in an editable textarea with a live character count (accounting for Mastodon's 23-character URL weight) so you can tweak the text before sharing.
 - **Post to Mastodon**: Post summaries (with the source URL) to Mastodon directly from the UI or CLI; the UI provides an **OK** button to reset the page for the next URL.
 - **Automatic Clipboard Copy**: The CLI automatically copies generated summaries to the system clipboard.
-- **Model Transparency**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:llama3.2:latest`).
+- **Model Transparency & Duration**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:llama3.2:latest`) and how long the AI took to generate it.
 - **Multi-Layered Content Sanitization (Prompt-Injection Defense)**: Scraped content is sanitized against indirect prompt injection and hidden text smuggling before reaching the AI. Settings are configurable in both the web UI and CLI:
   - **Hidden HTML Stripping**: Elements with `display:none`, `visibility:hidden`, `opacity:0`, `hidden`, `aria-hidden`, and HTML comments (`<!-- ... -->`) are stripped.
   - **Invisible Unicode Stripping**: Unicode tag block (`U+E0000`–`U+E007F`), zero-width characters (ZWSP, ZWNJ, ZWJ, word-joiner, BOM), and bidi override controls are removed.

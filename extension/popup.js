@@ -15,6 +15,7 @@ const stripHiddenCheckbox = document.getElementById('stripHidden');
 const stripUnicodeCheckbox = document.getElementById('stripUnicode');
 const usePytectorCheckbox = document.getElementById('usePytector');
 const stripQueryCheckbox = document.getElementById('stripQuery');
+const forceOllamaCheckbox = document.getElementById('forceOllama');
 
 const toggleServerConfigBtn = document.getElementById('toggleServerConfigBtn');
 const serverConfigPanel = document.getElementById('serverConfigPanel');
@@ -27,6 +28,10 @@ const summaryEdit = document.getElementById('summaryEdit');
 const charCountEl = document.getElementById('charCount');
 const modelContainer = document.getElementById('modelContainer');
 const modelNameEl = document.getElementById('modelName');
+const durationSpan = document.getElementById('durationSpan');
+const durationTimeEl = document.getElementById('durationTime');
+const standaloneDurationContainer = document.getElementById('standaloneDurationContainer');
+const standaloneDurationTimeEl = document.getElementById('standaloneDurationTime');
 const urlMetaEl = document.getElementById('urlMeta');
 const mastodonStatusBar = document.getElementById('mastodonStatusBar');
 
@@ -36,6 +41,7 @@ let currentUrl = '';
 let lastUrl = '';
 let currentSummary = '';
 let currentModel = '';
+let currentDuration = null;
 let mastodonSuccess = null;
 let isLoading = false;
 let isPostingToMastodon = false;
@@ -52,13 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery']);
+      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery', 'forceOllama']);
       if (data.apiUrl) apiUrl = data.apiUrl;
       if (data.limit !== undefined) limitInput.value = data.limit;
       if (data.stripHidden !== undefined) stripHiddenCheckbox.checked = data.stripHidden;
       if (data.stripUnicode !== undefined) stripUnicodeCheckbox.checked = data.stripUnicode;
       if (data.usePytector !== undefined) usePytectorCheckbox.checked = data.usePytector;
       if (data.stripQuery !== undefined) stripQueryCheckbox.checked = data.stripQuery;
+      if (data.forceOllama !== undefined) forceOllamaCheckbox.checked = data.forceOllama;
     } else if (window.localStorage) {
       const savedApiUrl = localStorage.getItem('tldr_api_url');
       if (savedApiUrl) apiUrl = savedApiUrl;
@@ -80,7 +87,8 @@ async function saveSettings() {
     stripHidden: stripHiddenCheckbox.checked,
     stripUnicode: stripUnicodeCheckbox.checked,
     usePytector: usePytectorCheckbox.checked,
-    stripQuery: stripQueryCheckbox.checked
+    stripQuery: stripQueryCheckbox.checked,
+    forceOllama: forceOllamaCheckbox.checked
   };
 
   try {
@@ -130,6 +138,7 @@ function setupEventListeners() {
   stripUnicodeCheckbox.addEventListener('change', () => saveSettings());
   usePytectorCheckbox.addEventListener('change', () => saveSettings());
   stripQueryCheckbox.addEventListener('change', () => saveSettings());
+  forceOllamaCheckbox.addEventListener('change', () => saveSettings());
 
   summarizeBtn.addEventListener('click', summarize);
   mastodonBtn.addEventListener('click', postToMastodon);
@@ -167,6 +176,7 @@ function updateUiState() {
   stripUnicodeCheckbox.disabled = isLoading;
   usePytectorCheckbox.disabled = isLoading;
   stripQueryCheckbox.disabled = isLoading;
+  forceOllamaCheckbox.disabled = isLoading;
 
   if (currentSummary) {
     resultContainer.classList.remove('hidden');
@@ -187,8 +197,20 @@ function updateUiState() {
     if (currentModel) {
       modelContainer.classList.remove('hidden');
       modelNameEl.textContent = currentModel;
+      if (currentDuration !== null && currentDuration !== undefined) {
+        durationSpan.classList.remove('hidden');
+        durationTimeEl.textContent = currentDuration;
+      } else {
+        durationSpan.classList.add('hidden');
+      }
+      standaloneDurationContainer.classList.add('hidden');
+    } else if (currentDuration !== null && currentDuration !== undefined) {
+      modelContainer.classList.add('hidden');
+      standaloneDurationContainer.classList.remove('hidden');
+      standaloneDurationTimeEl.textContent = `${currentDuration}s`;
     } else {
       modelContainer.classList.add('hidden');
+      standaloneDurationContainer.classList.add('hidden');
     }
 
     urlMetaEl.textContent = `URL: ${lastUrl}`;
@@ -230,6 +252,7 @@ async function summarize() {
   clearError();
   currentSummary = '';
   currentModel = '';
+  currentDuration = null;
   mastodonSuccess = null;
   updateUiState();
 
@@ -239,7 +262,8 @@ async function summarize() {
     strip_hidden: stripHiddenCheckbox.checked,
     strip_unicode: stripUnicodeCheckbox.checked,
     use_pytector: usePytectorCheckbox.checked,
-    strip_query: stripQueryCheckbox.checked
+    strip_query: stripQueryCheckbox.checked,
+    force_ollama: forceOllamaCheckbox.checked
   };
 
   try {
@@ -273,6 +297,7 @@ async function summarize() {
     lastUrl = data.url || targetUrl;
     urlInput.value = data.url || targetUrl;
     currentModel = data.model || '';
+    currentDuration = (data.duration !== undefined && data.duration !== null) ? data.duration : null;
 
     summaryEdit.value = currentSummary;
     updateCharCount();
@@ -344,6 +369,7 @@ async function postToMastodon() {
 function reloadPage() {
   currentSummary = '';
   currentModel = '';
+  currentDuration = null;
   mastodonSuccess = null;
   clearError();
   initActiveTabUrl();

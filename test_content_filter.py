@@ -100,6 +100,60 @@ def test_prompt_wrapping_all_variants():
     assert all("<document_content" in p for p in captured), captured
 
 
+def test_force_ollama():
+    import main
+
+    gemini_called = []
+    ollama_called = []
+
+    def fake_gemini(prompt, max_tokens=4096):
+        gemini_called.append(prompt)
+        main.LAST_MODEL_USED = "gemini-2.5-flash"
+        return "Gemini summary."
+
+    def fake_ollama(prompt, max_tokens=4096):
+        ollama_called.append(prompt)
+        main.LAST_MODEL_USED = "ollama:llama3.2:latest"
+        return "Ollama summary."
+
+    main._call_gemini = fake_gemini
+    main._call_ollama = fake_ollama
+
+    # When force_ollama=True, only ollama is called
+    gemini_called.clear()
+    ollama_called.clear()
+    res = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=200, force_ollama=True)
+    assert len(ollama_called) == 1, "expected _call_ollama to be called"
+    assert len(gemini_called) == 0, "expected _call_gemini not to be called"
+    assert main.LAST_MODEL_USED == "ollama:llama3.2:latest"
+    assert "Ollama summary" in res
+
+    # When force_ollama=False, gemini is called
+    gemini_called.clear()
+    ollama_called.clear()
+    res = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=200, force_ollama=False)
+    assert len(gemini_called) == 1, "expected _call_gemini to be called"
+    assert len(ollama_called) == 0, "expected _call_ollama not to be called"
+    assert main.LAST_MODEL_USED == "gemini-2.5-flash"
+    assert "Gemini summary" in res
+
+
+def test_generation_duration():
+    import main
+
+    def fake_gemini(prompt, max_tokens=4096):
+        main.LAST_MODEL_USED = "gemini-2.5-flash"
+        return "Generated summary."
+
+    main._call_gemini = fake_gemini
+    main.LAST_GENERATION_DURATION = None
+    res = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=200)
+    assert res is not None
+    assert main.LAST_GENERATION_DURATION is not None
+    assert isinstance(main.LAST_GENERATION_DURATION, float)
+    assert main.LAST_GENERATION_DURATION >= 0.0
+
+
 def main_run():
     tests = [
         test_strip_invisible_unicode,
@@ -107,6 +161,8 @@ def main_run():
         test_sanitize_text_runs_without_raising,
         test_sanitize_text_preserves_legitimate_content,
         test_prompt_wrapping_all_variants,
+        test_force_ollama,
+        test_generation_duration,
     ]
     for t in tests:
         t()

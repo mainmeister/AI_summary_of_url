@@ -2,10 +2,11 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-interface SummarizeResponse {
+export interface SummarizeResponse {
   summary: string;
   url: string;
   model?: string;
+  duration?: number;
 }
 
 @Injectable({
@@ -23,7 +24,8 @@ export class ApiService {
     stripHidden: boolean = true, 
     stripUnicode: boolean = true, 
     usePytector: boolean = true,
-    stripQuery: boolean = true
+    stripQuery: boolean = true,
+    forceOllama: boolean = false
   ): Observable<SummarizeResponse> {
     return this.http.post<SummarizeResponse>(`${this.apiUrl}/summarize`, { 
       url, 
@@ -31,7 +33,8 @@ export class ApiService {
       strip_hidden: stripHidden,
       strip_unicode: stripUnicode,
       use_pytector: usePytector,
-      strip_query: stripQuery
+      strip_query: stripQuery,
+      force_ollama: forceOllama
     });
   }
 
