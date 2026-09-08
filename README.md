@@ -47,8 +47,8 @@ LOG_LEVEL=INFO
 # Ollama server URL (default: http://localhost:11434)
 OLLAMA_HOST=http://localhost:11434
 
-# Local model to use for the fallback (default: llama3.2:latest)
-OLLAMA_MODEL=llama3.2:latest
+# Local model to use for the fallback (default: gemma_temperature_zero:latest)
+OLLAMA_MODEL=gemma_temperature_zero:latest
 ```
 
 ### API Server (optional)
@@ -175,7 +175,7 @@ uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-str
 - **Editable Summary**: The generated summary is displayed in an editable textarea with a live character count (accounting for Mastodon's 23-character URL weight) so you can tweak the text before sharing.
 - **Post to Mastodon**: Post summaries (with the source URL) to Mastodon directly from the UI or CLI; the UI provides an **OK** button to reset the page for the next URL.
 - **Automatic Clipboard Copy**: The CLI automatically copies generated summaries to the system clipboard.
-- **Model Transparency & Duration**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:llama3.2:latest`) and how long the AI took to generate it.
+- **Model Transparency & Duration**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:gemma_temperature_zero:latest`) and how long the AI took to generate it.
 - **Multi-Layered Content Sanitization (Prompt-Injection Defense)**: Scraped content is sanitized against indirect prompt injection and hidden text smuggling before reaching the AI. Settings are configurable in both the web UI and CLI:
   - **Hidden HTML Stripping**: Elements with `display:none`, `visibility:hidden`, `opacity:0`, `hidden`, `aria-hidden`, and HTML comments (`<!-- ... -->`) are stripped.
   - **Invisible Unicode Stripping**: Unicode tag block (`U+E0000`–`U+E007F`), zero-width characters (ZWSP, ZWNJ, ZWJ, word-joiner, BOM), and bidi override controls are removed.
@@ -210,7 +210,7 @@ If every Gemini model is rate-limited/quota-exhausted, the tool switches to a lo
 Prerequisites:
 
 - Install Ollama and start the server (`ollama serve`).
-- Pull a model, e.g. `ollama pull llama3.2`.
+- Pull a model, e.g. `ollama pull gemma_temperature_zero`.
 
 Configuration (optional, via environment variables or `.env`):
 
@@ -219,7 +219,7 @@ Configuration (optional, via environment variables or `.env`):
 OLLAMA_HOST=http://localhost:11434
 
 # Local model to use for the fallback (default shown)
-OLLAMA_MODEL=llama3.2:latest
+OLLAMA_MODEL=gemma_temperature_zero:latest
 ```
 
 No extra Python dependency is required; the fallback talks to Ollama's HTTP API directly.

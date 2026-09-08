@@ -113,7 +113,7 @@ def test_force_ollama():
 
     def fake_ollama(prompt, max_tokens=4096):
         ollama_called.append(prompt)
-        main.LAST_MODEL_USED = "ollama:llama3.2:latest"
+        main.LAST_MODEL_USED = f"ollama:{main.OLLAMA_MODEL}"
         return "Ollama summary."
 
     main._call_gemini = fake_gemini
@@ -125,7 +125,7 @@ def test_force_ollama():
     res = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=200, force_ollama=True)
     assert len(ollama_called) == 1, "expected _call_ollama to be called"
     assert len(gemini_called) == 0, "expected _call_gemini not to be called"
-    assert main.LAST_MODEL_USED == "ollama:llama3.2:latest"
+    assert main.LAST_MODEL_USED == f"ollama:{main.OLLAMA_MODEL}"
     assert "Ollama summary" in res
 
     # When force_ollama=False, gemini is called

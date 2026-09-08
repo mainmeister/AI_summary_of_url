@@ -31,7 +31,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 # Ollama local model configuration (used as a fallback when all Gemini
 # free-tier quotas are exhausted / all cloud models are unavailable).
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma_temperature_zero:latest")
 
 # Tracks which model actually produced the most recent successful generation.
 # It is updated by _call_gemini / _call_ollama and can be read by callers
