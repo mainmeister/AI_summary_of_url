@@ -278,6 +278,11 @@ button:disabled {
   color: #7f8c8d;
 }
 
+.char-count.over-limit {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
 .model-used {
   margin-top: 8px;
   font-size: 13px;

@@ -1,15 +1,19 @@
-"""Content sanitization layer for defending against prompt injection.
+"""Content sanitization and filtering layer.
 
-This module cleans web content extracted by the scraper before it is sent to
-the AI, neutralizing hidden-text smuggling and indirect prompt-injection
-payloads while preserving legitimate article text.
+This module handles:
+1. Cleaning web content extracted by the scraper before it is sent to the AI,
+   neutralizing hidden-text smuggling and indirect prompt-injection payloads
+   while preserving legitimate article text.
+2. Filtering AI-generated output using ``texthumanize`` before presenting or
+   dispatching it to downstream consumers.
 
 Design goals:
 - Deterministic, dependency-free HTML/Unicode cleaning (always available).
 - Optional ``pytector`` injection-phrase cleaning, lazily imported and wrapped
   in try/except so a missing / incompatible package degrades gracefully.
-- Filtering must never raise into the caller; on failure it falls back to the
-  built-in custom filters (clean-and-continue behavior).
+- AI output humanization and filtering via ``texthumanize`` with clean-and-continue
+  fallback behavior.
+- Filtering must never raise into the caller; on failure it falls back to safe defaults.
 """
 
 import logging
@@ -103,6 +107,38 @@ def strip_invisible_unicode(text: str, enabled: bool = True) -> str:
     return cleaned
 
 
+def strip_markdown(text: str) -> str:
+    """Removes common Markdown formatting characters from the text."""
+    if not text:
+        return text
+    text = re.sub(r'(\*\*|__)(.*?)\1', r'\2', text)
+    text = re.sub(r'(\*|_)(.*?)\1', r'\2', text)
+    text = text.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
+    text = text.replace('`', '')
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+    return text.strip()
+
+
+def smart_truncate(text: str, limit: int) -> str:
+    """Consistently truncates text to the last full sentence within the character limit."""
+    if not text or limit <= 0:
+        return text
+    text = strip_markdown(text)
+    if len(text) <= limit:
+        return text
+
+    snippet = text[:limit]
+    # Find the last sentence-ending punctuation (. ! ?) optionally followed by closing quotes or parentheses
+    matches = list(re.finditer(r'[.!?]["\'”’\)\]]?(?=\s|$)', snippet))
+    threshold = int(limit * 0.6)
+
+    if matches and matches[-1].end() > threshold:
+        return snippet[:matches[-1].end()].strip()
+    else:
+        return snippet[:max(0, limit - 3)].rstrip() + "..."
+
+
 def _pytector_sanitize(text: str) -> str:
     """Run ``pytector``'s input-sanitization pipeline if available.
 
@@ -147,4 +183,33 @@ def sanitize_text(text: str, strip_unicode: bool = True, use_pytector: bool = Tr
         return text
     except Exception:
         logger.warning("sanitize_text failed; returning original text.", exc_info=True)
+        return text
+
+
+def filter_ai_output(text: str, limit: int | None = None) -> str:
+    """Filter and humanize AI-generated output using texthumanize.
+
+    Cleans AI phrasing artifacts, normalizes typography, and ensures natural
+    flow while preserving technical content and substance. When ``limit`` is
+    provided, ensures the returned text is truncated to stay within the character
+    limit. Lazily imported and guarded so that errors gracefully fall back to the
+    original text (smart-truncated if a limit was set).
+    Never raises.
+    """
+    if not text:
+        return text
+    try:
+        import texthumanize
+        result = texthumanize.humanize(text)
+        if hasattr(result, "text") and result.text:
+            output = result.text
+        else:
+            output = str(result)
+        if limit is not None and limit > 0:
+            output = smart_truncate(output, limit)
+        return output
+    except Exception:
+        logger.warning("filter_ai_output failed; returning original AI output.", exc_info=True)
+        if limit is not None and limit > 0:
+            return smart_truncate(text, limit)
         return text

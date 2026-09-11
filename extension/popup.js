@@ -15,6 +15,7 @@ const stripHiddenCheckbox = document.getElementById('stripHidden');
 const stripUnicodeCheckbox = document.getElementById('stripUnicode');
 const usePytectorCheckbox = document.getElementById('usePytector');
 const stripQueryCheckbox = document.getElementById('stripQuery');
+const useHumanizerCheckbox = document.getElementById('useHumanizer');
 const forceOllamaCheckbox = document.getElementById('forceOllama');
 
 const toggleServerConfigBtn = document.getElementById('toggleServerConfigBtn');
@@ -40,6 +41,8 @@ let apiUrl = DEFAULT_API_URL;
 let currentUrl = '';
 let lastUrl = '';
 let currentSummary = '';
+let rawSummary = '';
+let filteredSummary = '';
 let currentModel = '';
 let currentDuration = null;
 let mastodonSuccess = null;
@@ -58,13 +61,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery', 'forceOllama']);
+      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery', 'forceOllama', 'useHumanizer']);
       if (data.apiUrl) apiUrl = data.apiUrl;
       if (data.limit !== undefined) limitInput.value = data.limit;
       if (data.stripHidden !== undefined) stripHiddenCheckbox.checked = data.stripHidden;
       if (data.stripUnicode !== undefined) stripUnicodeCheckbox.checked = data.stripUnicode;
       if (data.usePytector !== undefined) usePytectorCheckbox.checked = data.usePytector;
       if (data.stripQuery !== undefined) stripQueryCheckbox.checked = data.stripQuery;
+      if (data.useHumanizer !== undefined) useHumanizerCheckbox.checked = data.useHumanizer;
       if (data.forceOllama !== undefined) forceOllamaCheckbox.checked = data.forceOllama;
     } else if (window.localStorage) {
       const savedApiUrl = localStorage.getItem('tldr_api_url');
@@ -88,6 +92,7 @@ async function saveSettings() {
     stripUnicode: stripUnicodeCheckbox.checked,
     usePytector: usePytectorCheckbox.checked,
     stripQuery: stripQueryCheckbox.checked,
+    useHumanizer: useHumanizerCheckbox.checked,
     forceOllama: forceOllamaCheckbox.checked
   };
 
@@ -133,11 +138,22 @@ function setupEventListeners() {
     }
   });
 
-  limitInput.addEventListener('change', () => saveSettings());
+  limitInput.addEventListener('input', () => {
+    saveSettings();
+    updateCharCount();
+  });
+  limitInput.addEventListener('change', () => {
+    saveSettings();
+    updateCharCount();
+  });
   stripHiddenCheckbox.addEventListener('change', () => saveSettings());
   stripUnicodeCheckbox.addEventListener('change', () => saveSettings());
   usePytectorCheckbox.addEventListener('change', () => saveSettings());
   stripQueryCheckbox.addEventListener('change', () => saveSettings());
+  useHumanizerCheckbox.addEventListener('change', () => {
+    saveSettings();
+    onHumanizerToggle();
+  });
   forceOllamaCheckbox.addEventListener('change', () => saveSettings());
 
   summarizeBtn.addEventListener('click', summarize);
@@ -159,10 +175,29 @@ function setupEventListeners() {
   });
 }
 
+function onHumanizerToggle() {
+  if (rawSummary || filteredSummary) {
+    if (useHumanizerCheckbox.checked && filteredSummary) {
+      currentSummary = filteredSummary;
+      summaryEdit.value = filteredSummary;
+    } else if (!useHumanizerCheckbox.checked && rawSummary) {
+      currentSummary = rawSummary;
+      summaryEdit.value = rawSummary;
+    }
+    updateCharCount();
+  }
+}
+
 function updateCharCount() {
   const text = summaryEdit.value || '';
   const count = text.length + FOOTER_PREFIX.length + MASTODON_URL_WEIGHT;
-  charCountEl.textContent = `${count} / 500 characters (incl. 23 for URL)`;
+  const currentLimit = parseInt(limitInput.value, 10) || 500;
+  charCountEl.textContent = `${count} / ${currentLimit} characters (incl. 23 for URL)`;
+  if (count > currentLimit) {
+    charCountEl.classList.add('over-limit');
+  } else {
+    charCountEl.classList.remove('over-limit');
+  }
 }
 
 function updateUiState() {
@@ -176,6 +211,7 @@ function updateUiState() {
   stripUnicodeCheckbox.disabled = isLoading;
   usePytectorCheckbox.disabled = isLoading;
   stripQueryCheckbox.disabled = isLoading;
+  useHumanizerCheckbox.disabled = isLoading;
   forceOllamaCheckbox.disabled = isLoading;
 
   if (currentSummary) {
@@ -263,6 +299,7 @@ async function summarize() {
     strip_unicode: stripUnicodeCheckbox.checked,
     use_pytector: usePytectorCheckbox.checked,
     strip_query: stripQueryCheckbox.checked,
+    use_humanizer: useHumanizerCheckbox.checked,
     force_ollama: forceOllamaCheckbox.checked
   };
 
@@ -293,6 +330,8 @@ async function summarize() {
     }
 
     const data = await response.json();
+    rawSummary = data.raw_summary || '';
+    filteredSummary = data.filtered_summary || '';
     currentSummary = data.summary || '';
     lastUrl = data.url || targetUrl;
     urlInput.value = data.url || targetUrl;

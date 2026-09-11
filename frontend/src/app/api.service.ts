@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 
 export interface SummarizeResponse {
   summary: string;
+  raw_summary?: string;
+  filtered_summary?: string;
   url: string;
   model?: string;
   duration?: number;
@@ -25,7 +27,8 @@ export class ApiService {
     stripUnicode: boolean = true, 
     usePytector: boolean = true,
     stripQuery: boolean = true,
-    forceOllama: boolean = false
+    forceOllama: boolean = false,
+    useHumanizer: boolean = true
   ): Observable<SummarizeResponse> {
     return this.http.post<SummarizeResponse>(`${this.apiUrl}/summarize`, { 
       url, 
@@ -34,7 +37,8 @@ export class ApiService {
       strip_unicode: stripUnicode,
       use_pytector: usePytector,
       strip_query: stripQuery,
-      force_ollama: forceOllama
+      force_ollama: forceOllama,
+      use_humanizer: useHumanizer
     });
   }
 

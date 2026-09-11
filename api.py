@@ -26,6 +26,7 @@ class SummarizeRequest(BaseModel):
     strip_unicode: bool = True
     use_pytector: bool = True
     strip_query: bool = True
+    use_humanizer: bool = True
     force_ollama: bool = False
 
 class PostMastodonRequest(BaseModel):
@@ -34,6 +35,8 @@ class PostMastodonRequest(BaseModel):
 
 class SummarizeResponse(BaseModel):
     summary: str
+    raw_summary: Optional[str] = None
+    filtered_summary: Optional[str] = None
     url: str
     model: Optional[str] = None
     duration: Optional[float] = None
@@ -65,7 +68,12 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
             ),
         )
 
-    tldr = generate_tldr(raw_text, limit=request.limit, force_ollama=request.force_ollama)
+    tldr = generate_tldr(
+        raw_text,
+        limit=request.limit,
+        force_ollama=request.force_ollama,
+        use_humanizer=request.use_humanizer
+    )
     if not tldr:
         raise HTTPException(status_code=500, detail="Failed to generate TL;DR.")
 
@@ -75,6 +83,8 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
 
     return SummarizeResponse(
         summary=tldr, 
+        raw_summary=main.LAST_RAW_SUMMARY,
+        filtered_summary=main.LAST_FILTERED_SUMMARY,
         url=url_to_return,
         model=main.LAST_MODEL_USED,
         duration=main.LAST_GENERATION_DURATION,

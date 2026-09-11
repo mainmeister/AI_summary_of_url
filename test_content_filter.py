@@ -16,9 +16,12 @@ os.environ.setdefault("GEMINI_API_KEY", "test-dummy-key")
 from bs4 import BeautifulSoup  # noqa: E402
 
 from content_filter import (  # noqa: E402
+    filter_ai_output,
     sanitize_text,
+    smart_truncate,
     strip_hidden_html,
     strip_invisible_unicode,
+    strip_markdown,
 )
 
 
@@ -154,6 +157,132 @@ def test_generation_duration():
     assert main.LAST_GENERATION_DURATION >= 0.0
 
 
+def test_filter_ai_output_runs_and_cleans():
+    text = "It is important to note that artificial intelligence generates concise content."
+    res = filter_ai_output(text)
+    assert res is not None
+    assert isinstance(res, str)
+    assert len(res) > 0
+
+
+def test_filter_ai_output_respects_size_limit():
+    long_text = "This is the first sentence about technology. This is the second sentence detailing architecture. This is the third sentence explaining performance characteristics."
+    # Direct smart_truncate check
+    truncated = smart_truncate(long_text, limit=50)
+    assert len(truncated) <= 50
+    assert truncated.endswith(".") or truncated.endswith("...")
+
+    # filter_ai_output with limit
+    res_limited = filter_ai_output(long_text, limit=60)
+    assert res_limited is not None
+    assert len(res_limited) <= 60
+
+    # Test error fallback in filter_ai_output with limit
+    from unittest.mock import patch
+    with patch("texthumanize.humanize", side_effect=RuntimeError("Simulated error")):
+        fallback_res = filter_ai_output(long_text, limit=60)
+        assert len(fallback_res) <= 60
+
+
+def test_filter_ai_output_empty_and_none():
+    assert filter_ai_output("") == ""
+    assert filter_ai_output(None) is None
+
+
+def test_smart_truncate_sentence_endings():
+    # Tests that . ! ? and trailing quotes are properly recognized as sentence endings
+    text = "First sentence here! Second question is why? Third statement is conclusive.\" Extra trailing words."
+    truncated = smart_truncate(text, limit=80)
+    assert len(truncated) <= 80
+    assert truncated == "First sentence here! Second question is why? Third statement is conclusive.\""
+
+    # Tests fallback to hard truncation when no sentence boundary in threshold
+    text_no_boundary = "Word " * 20
+    truncated_fallback = smart_truncate(text_no_boundary, limit=30)
+    assert len(truncated_fallback) <= 30
+    assert truncated_fallback.endswith("...")
+
+
+def test_generate_tldr_applies_ai_output_filter():
+    import main
+    filter_called = []
+    original_filter = main.filter_ai_output
+
+    def fake_filter(t, limit=None):
+        filter_called.append((t, limit))
+        return t + " [FILTERED]"
+
+    main.filter_ai_output = fake_filter
+    try:
+        def fake_gemini(prompt, max_tokens=4096):
+            return "Generated raw AI summary sentence."
+
+        main._call_gemini = fake_gemini
+        res = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=200)
+        assert len(filter_called) == 1, "Expected filter_ai_output to be called on raw AI output"
+        expected_summary_limit = 200 - main.MASTODON_FOOTER_LEN
+        assert filter_called[0][1] == expected_summary_limit, f"Expected limit={expected_summary_limit} to be passed to filter_ai_output"
+        assert "[FILTERED]" in res
+        assert len(res) + main.MASTODON_FOOTER_LEN <= 200
+        assert main.LAST_RAW_SUMMARY == "Generated raw AI summary sentence."
+        assert main.LAST_FILTERED_SUMMARY == "Generated raw AI summary sentence. [FILTERED]"
+    finally:
+        main.filter_ai_output = original_filter
+
+
+def test_generate_tldr_use_humanizer_toggle():
+    import main
+    original_filter = main.filter_ai_output
+
+    def fake_filter(t, limit=None):
+        return t + " [HUMANIZED] " + ("Extra long padding sentence to test limit enforcement. " * 10)
+
+    main.filter_ai_output = fake_filter
+    try:
+        def fake_gemini(prompt, max_tokens=4096):
+            return "Raw AI summary sentence."
+
+        main._call_gemini = fake_gemini
+        
+        # Test default (use_humanizer=True)
+        res_default = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=80)
+        assert len(res_default) + main.MASTODON_FOOTER_LEN <= 80
+        assert len(main.LAST_FILTERED_SUMMARY) + main.MASTODON_FOOTER_LEN <= 80
+        assert len(main.LAST_RAW_SUMMARY) + main.MASTODON_FOOTER_LEN <= 80
+
+        # Test use_humanizer=False
+        res_raw = main.generate_tldr("Valid article text for testing that is long enough. " * 5, limit=80, use_humanizer=False)
+        assert "[HUMANIZED]" not in res_raw
+        assert res_raw == "Raw AI summary sentence."
+        assert len(res_raw) + main.MASTODON_FOOTER_LEN <= 80
+    finally:
+        main.filter_ai_output = original_filter
+
+
+def test_api_summarize_humanizer_response():
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    import api
+    from api import SummarizeRequest
+
+    with patch("api.ArticleScraper.scrape", new_callable=AsyncMock) as mock_scrape:
+        mock_scrape.return_value = "Valid article content for summarization testing. " * 10
+        with patch("api.generate_tldr") as mock_gen:
+            mock_gen.return_value = "Filtered AI Summary."
+            api.main.LAST_RAW_SUMMARY = "Raw AI Summary."
+            api.main.LAST_FILTERED_SUMMARY = "Filtered AI Summary."
+            api.main.LAST_MODEL_USED = "gemini-2.5-flash"
+            api.main.LAST_GENERATION_DURATION = 1.23
+
+            req = SummarizeRequest(url="https://example.com/test", use_humanizer=True)
+            res = asyncio.run(api.summarize(req))
+            assert res.summary == "Filtered AI Summary."
+            assert res.raw_summary == "Raw AI Summary."
+            assert res.filtered_summary == "Filtered AI Summary."
+            assert res.model == "gemini-2.5-flash"
+            assert res.duration == 1.23
+
+
 def main_run():
     tests = [
         test_strip_invisible_unicode,
@@ -163,6 +292,13 @@ def main_run():
         test_prompt_wrapping_all_variants,
         test_force_ollama,
         test_generation_duration,
+        test_filter_ai_output_runs_and_cleans,
+        test_filter_ai_output_respects_size_limit,
+        test_smart_truncate_sentence_endings,
+        test_filter_ai_output_empty_and_none,
+        test_generate_tldr_applies_ai_output_filter,
+        test_generate_tldr_use_humanizer_toggle,
+        test_api_summarize_humanizer_response,
     ]
     for t in tests:
         t()

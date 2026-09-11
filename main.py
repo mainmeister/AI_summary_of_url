@@ -15,6 +15,7 @@ from google.genai import types
 from dotenv import load_dotenv
 from scraper import ArticleScraper
 from mastodon_client import post_to_mastodon
+from content_filter import filter_ai_output, smart_truncate as _smart_truncate, strip_markdown as _strip_markdown
 
 # Load environment variables from .env file, forcing override of existing shell variables
 load_dotenv(override=True)
@@ -39,6 +40,9 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma_temperature_zero:latest")
 LAST_MODEL_USED: Optional[str] = None
 # Tracks the time (in seconds) the AI took for the most recent summarization.
 LAST_GENERATION_DURATION: Optional[float] = None
+# Tracks the prefiltered (raw AI output) and filtered (humanized) summaries.
+LAST_RAW_SUMMARY: Optional[str] = None
+LAST_FILTERED_SUMMARY: Optional[str] = None
 
 if not API_KEY:
     logging.error("GEMINI_API_KEY not found in environment variables or .env file.")
@@ -230,41 +234,18 @@ def _call_ollama(prompt: str, max_tokens: int = 4096) -> Optional[str]:
         return None
 
 
-def _strip_markdown(text: str) -> str:
-    """Removes common Markdown formatting characters from the text."""
-    # Remove bold and italic markers
-    text = re.sub(r'(\*\*|__)(.*?)\1', r'\2', text)
-    text = re.sub(r'(\*|_)(.*?)\1', r'\2', text)
-    # Remove remaining markers just in case
-    text = text.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
-    # Remove backticks
-    text = text.replace('`', '')
-    # Remove markdown headers
-    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
-    # Remove markdown links [text](url) -> text
-    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
-    return text.strip()
+# URL footer length accounting for Mastodon's 23-character URL weight and footer prefix
+FOOTER_PREFIX = "\n\nRead more: "
+MASTODON_URL_WEIGHT = 23
+MASTODON_FOOTER_LEN = len(FOOTER_PREFIX) + MASTODON_URL_WEIGHT  # 36
 
 
-def _smart_truncate(text: str, limit: int) -> str:
-    """Consistently truncates text to the last full sentence within the character limit."""
-    text = _strip_markdown(text)
-    
-    if len(text) <= limit:
-        return text
-    
-    snippet = text[:limit]
-    last_period = snippet.rfind('.')
-    threshold = int(limit * 0.6)
-    
-    if last_period > threshold:
-        return snippet[:last_period + 1]
-    else:
-        # Fallback to hard truncation if no period found in the last part
-        return snippet[:limit - 3] + "..."
-
-
-def generate_tldr(text: str, limit: int = 500, force_ollama: bool = False) -> Optional[str]:
+def generate_tldr(
+    text: str,
+    limit: int = 500,
+    force_ollama: bool = False,
+    use_humanizer: bool = True
+) -> Optional[str]:
     """Uses a Map-Reduce strategy to generate a TL;DR for potentially long text.
 
     Returns None if generation fails or input is too short.
@@ -273,16 +254,20 @@ def generate_tldr(text: str, limit: int = 500, force_ollama: bool = False) -> Op
         logging.warning("Input text is too short to summarize.")
         return None
 
-    # Reset so LAST_MODEL_USED and LAST_GENERATION_DURATION reflect only this generation run.
-    global LAST_MODEL_USED, LAST_GENERATION_DURATION
+    # Reset so LAST_MODEL_USED, LAST_GENERATION_DURATION, LAST_RAW_SUMMARY,
+    # and LAST_FILTERED_SUMMARY reflect only this generation run.
+    global LAST_MODEL_USED, LAST_GENERATION_DURATION, LAST_RAW_SUMMARY, LAST_FILTERED_SUMMARY
     LAST_MODEL_USED = None
     LAST_GENERATION_DURATION = None
+    LAST_RAW_SUMMARY = None
+    LAST_FILTERED_SUMMARY = None
 
     start_time = time.perf_counter()
     call_fn = _call_ollama if force_ollama else _call_gemini
 
     CHUNK_SIZE = 100000  # Large enough to handle most articles in a single pass
-    persona = get_persona(limit)
+    summary_limit = max(10, limit - MASTODON_FOOTER_LEN) if limit > MASTODON_FOOTER_LEN else limit
+    persona = get_persona(summary_limit)
     
     if len(text) <= CHUNK_SIZE:
         prompt = (
@@ -295,7 +280,9 @@ def generate_tldr(text: str, limit: int = 500, force_ollama: bool = False) -> Op
             return None
 
         LAST_GENERATION_DURATION = round(time.perf_counter() - start_time, 2)
-        return _smart_truncate(tldr, limit)
+        LAST_RAW_SUMMARY = _smart_truncate(tldr, summary_limit)
+        LAST_FILTERED_SUMMARY = _smart_truncate(filter_ai_output(tldr, limit=summary_limit), summary_limit)
+        return LAST_FILTERED_SUMMARY if use_humanizer else LAST_RAW_SUMMARY
 
     # Map Phase: Summarize chunks
     logging.info("--- Article is very long. Using Map-Reduce summarization...")
@@ -328,7 +315,9 @@ def generate_tldr(text: str, limit: int = 500, force_ollama: bool = False) -> Op
         return None
 
     LAST_GENERATION_DURATION = round(time.perf_counter() - start_time, 2)
-    return _smart_truncate(tldr, limit)
+    LAST_RAW_SUMMARY = _smart_truncate(tldr, summary_limit)
+    LAST_FILTERED_SUMMARY = _smart_truncate(filter_ai_output(tldr, limit=summary_limit), summary_limit)
+    return LAST_FILTERED_SUMMARY if use_humanizer else LAST_RAW_SUMMARY
 
 
 def main() -> None:
@@ -342,6 +331,7 @@ def main() -> None:
     parser.add_argument("--no-strip-unicode", action="store_false", dest="strip_unicode", help="Disable stripping invisible Unicode")
     parser.add_argument("--no-pytector", action="store_false", dest="use_pytector", help="Disable pytector sanitization")
     parser.add_argument("--no-strip-query", action="store_false", dest="strip_query", help="Disable stripping query parameters")
+    parser.add_argument("--no-humanizer", "--no-humanize", action="store_false", dest="use_humanizer", help="Disable texthumanize AI output filtering")
     args = parser.parse_args()
 
     url = args.url
@@ -380,7 +370,12 @@ def main() -> None:
         logging.info("--- Generating TL;DR with Ollama (%s) (Limit: %d)...", OLLAMA_MODEL, args.limit)
     else:
         logging.info("--- Generating TL;DR with Gemini 2.5 Flash (Limit: %d)...", args.limit)
-    tldr = generate_tldr(raw_text, limit=args.limit, force_ollama=args.force_ollama)
+    tldr = generate_tldr(
+        raw_text,
+        limit=args.limit,
+        force_ollama=args.force_ollama,
+        use_humanizer=args.use_humanizer
+    )
     if not tldr:
         print("Error: Failed to generate TL;DR. Please try again later.")
         return

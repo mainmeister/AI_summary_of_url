@@ -95,11 +95,12 @@ The backend exposes two endpoints:
     "strip_unicode": true,
     "use_pytector": true,
     "strip_query": true,
+    "use_humanizer": true,
     "force_ollama": false
   }
   ```
   *(All fields except `url` are optional with sensible defaults)*.  
-  Returns `{ "summary": "...", "url": "...", "model": "gemini-2.5-flash", "duration": 1.42 }`.
+  Returns `{ "summary": "...", "raw_summary": "...", "filtered_summary": "...", "url": "...", "model": "gemini-2.5-flash", "duration": 1.42 }`.
 
 - `POST /api/mastodon` — Request body: `{ "summary": "...", "url": "..." }`.  
   Returns `{ "success": true }`.
@@ -159,8 +160,8 @@ uv run main.py <URL> --force-ollama
 # Shorthand:
 uv run main.py <URL> -o
 
-# Disable specific content sanitization options
-uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-strip-query
+# Disable specific content sanitization or output filtering options
+uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-strip-query --no-humanizer
 ```
 
 *Notes:*
@@ -176,6 +177,7 @@ uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-str
 - **Post to Mastodon**: Post summaries (with the source URL) to Mastodon directly from the UI or CLI; the UI provides an **OK** button to reset the page for the next URL.
 - **Automatic Clipboard Copy**: The CLI automatically copies generated summaries to the system clipboard.
 - **Model Transparency & Duration**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:gemma_temperature_zero:latest`) and how long the AI took to generate it.
+- **AI Output Humanization (texthumanize)**: Filters and humanizes AI-generated summaries using `texthumanize` to clean AI phrasing artifacts and normalize flow, with a user-toggleable checkbox that defaults to enabled and instant toggling between prefiltered and filtered outputs.
 - **Multi-Layered Content Sanitization (Prompt-Injection Defense)**: Scraped content is sanitized against indirect prompt injection and hidden text smuggling before reaching the AI. Settings are configurable in both the web UI and CLI:
   - **Hidden HTML Stripping**: Elements with `display:none`, `visibility:hidden`, `opacity:0`, `hidden`, `aria-hidden`, and HTML comments (`<!-- ... -->`) are stripped.
   - **Invisible Unicode Stripping**: Unicode tag block (`U+E0000`–`U+E007F`), zero-width characters (ZWSP, ZWNJ, ZWJ, word-joiner, BOM), and bidi override controls are removed.

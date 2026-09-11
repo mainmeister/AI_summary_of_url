@@ -3,6 +3,7 @@ import logging
 from typing import Optional
 from mastodon import Mastodon
 from dotenv import load_dotenv
+from content_filter import smart_truncate
 
 load_dotenv()
 
@@ -40,17 +41,11 @@ def post_to_mastodon(text: str, url: str) -> bool:
 
         if len(text) + footer_len > max_total_len:
             # Truncate summary to fit, leaving room for footer
-            allowed_text_len = max_total_len - footer_len - 3
+            allowed_text_len = max_total_len - footer_len
             if allowed_text_len > 0:
-                # Try to find the last sentence boundary
-                truncated_text = text[:allowed_text_len]
-                last_period = truncated_text.rfind('.')
-                if last_period > (allowed_text_len * 0.5):
-                    status_text = f"{truncated_text[:last_period + 1]}{footer}"
-                else:
-                    status_text = f"{truncated_text}...{footer}"
+                truncated_text = smart_truncate(text, allowed_text_len)
+                status_text = f"{truncated_text}{footer}"
             else:
-                # Should not happen with typical limits, but as fallback:
                 status_text = url
         else:
             status_text = f"{text}{footer}"

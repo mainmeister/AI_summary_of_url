@@ -6,6 +6,8 @@ A Manifest V3 browser extension for Google Chrome (and Chromium-based browsers s
 
 - **One-Click Active Tab Detection**: Automatically pre-fills the URL input with the active web page address upon opening the popup.
 - **AI Article Summaries**: Requests summaries directly from the backend API server.
+- **Force Ollama**: Option to force using local Ollama model instead of Gemini.
+- **AI Output Humanization (texthumanize)**: Cleans AI phrasing artifacts and enables instant toggling between raw and humanized summaries.
 - **Configurable Sanitization (Prompt-Injection Defense)**:
   - Strip Hidden HTML
   - Strip Invisible Unicode

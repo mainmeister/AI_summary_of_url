@@ -75,6 +75,10 @@ import { ApiService } from './api.service';
               <a href="https://www.google.com/search?q=Strip+Query+Params" target="_blank" title="Strip Query Params search" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
             <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="useHumanizer" (ngModelChange)="onHumanizerChange()" [disabled]="loading"> Use Humanizer
+              <a href="https://pypi.org/project/texthumanize/" target="_blank" title="texthumanize on PyPI" style="font-size: 12px; margin-left: 5px;">(?)</a>
+            </label>
+            <label class="checkbox-label">
               <input type="checkbox" [(ngModel)]="forceOllama" [disabled]="loading"> Force Ollama
               <a href="https://ollama.com" target="_blank" title="Ollama" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
@@ -93,8 +97,8 @@ import { ApiService } from './api.service';
             rows="10"
             placeholder="Edit the summary here before posting..."
           ></textarea>
-          <div class="char-count">
-            {{ mastodonCharCount }} / 500 characters (incl. 23 for URL)
+          <div class="char-count" [class.over-limit]="mastodonCharCount > limit">
+            {{ mastodonCharCount }} / {{ limit }} characters (incl. 23 for URL)
           </div>
           <div *ngIf="model" class="model-used">
             Model used: <strong>{{ model }}</strong>
@@ -239,6 +243,10 @@ import { ApiService } from './api.service';
       font-size: 13px;
       color: #7f8c8d;
     }
+    .char-count.over-limit {
+      color: #e74c3c;
+      font-weight: bold;
+    }
     .model-used {
       margin-top: 10px;
       font-size: 14px;
@@ -311,10 +319,13 @@ export class AppComponent implements AfterViewInit {
   stripUnicode = true;
   usePytector = true;
   stripQuery = true;
+  useHumanizer = true;
   forceOllama = false;
   
   lastUrl = '';
   summary = '';
+  rawSummary = '';
+  filteredSummary = '';
   model = '';
   duration: number | null = null;
   mastodonSuccess: boolean | null = null;
@@ -356,9 +367,12 @@ export class AppComponent implements AfterViewInit {
       this.stripUnicode, 
       this.usePytector,
       this.stripQuery,
-      this.forceOllama
+      this.forceOllama,
+      this.useHumanizer
     ).subscribe({
       next: (res) => {
+        this.rawSummary = res.raw_summary || '';
+        this.filteredSummary = res.filtered_summary || '';
         this.summary = res.summary;
         this.lastUrl = res.url;
         this.url = res.url; // Update input field with the returned URL (possibly stripped)
@@ -372,6 +386,16 @@ export class AppComponent implements AfterViewInit {
         this.loading = false;
       }
     });
+  }
+
+  onHumanizerChange() {
+    if (this.rawSummary || this.filteredSummary) {
+      if (this.useHumanizer && this.filteredSummary) {
+        this.summary = this.filteredSummary;
+      } else if (!this.useHumanizer && this.rawSummary) {
+        this.summary = this.rawSummary;
+      }
+    }
   }
 
   reload() {
