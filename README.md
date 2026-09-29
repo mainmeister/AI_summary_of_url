@@ -102,8 +102,16 @@ The backend exposes two endpoints:
   *(All fields except `url` are optional with sensible defaults)*.  
   Returns `{ "summary": "...", "raw_summary": "...", "filtered_summary": "...", "url": "...", "model": "gemini-2.5-flash", "duration": 1.42 }`.
 
-- `POST /api/mastodon` — Request body: `{ "summary": "...", "url": "..." }`.  
-  Returns `{ "success": true }`.
+- `POST /api/mastodon` — Request body:
+  ```json
+  {
+    "summary": "...",
+    "url": "...",
+    "open_in_browser": false
+  }
+  ```
+  *(All fields except `summary` and `url` are optional; `open_in_browser` defaults to `false`)*.  
+  Returns `{ "success": true, "post_url": "https://mastodon.instance/@user/123456789" }`.
 
 ### 2. Frontend (Angular)
 
@@ -150,6 +158,11 @@ uv run main.py <URL> --mastodon
 # Shorthand:
 uv run main.py <URL> -m
 
+# Post to Mastodon and automatically open the post in your default browser
+uv run main.py <URL> --open-mastodon
+# Shorthand:
+uv run main.py <URL> -b
+
 # Open the summary in Sublime Text
 uv run main.py <URL> --sublime
 # Shorthand:
@@ -174,7 +187,7 @@ uv run main.py <URL> --no-strip-hidden --no-strip-unicode --no-pytector --no-str
 - **Real-time Summarization**: Enter a URL and get an AI-generated summary in seconds.
 - **Keyboard Friendly**: The URL input is focused automatically on page load, and pressing **Enter** submits the URL.
 - **Editable Summary**: The generated summary is displayed in an editable textarea with a live character count (accounting for Mastodon's 23-character URL weight) so you can tweak the text before sharing.
-- **Post to Mastodon**: Post summaries (with the source URL) to Mastodon directly from the UI or CLI; the UI provides an **OK** button to reset the page for the next URL.
+- **Post to Mastodon & Browser View**: Post summaries (with the source URL) to Mastodon directly from the UI, Chrome extension, or CLI, with an optional toggle to immediately open the published post in your default browser and a direct "View Post" link on success. The UI provides an **OK** button to reset the page for the next URL.
 - **Automatic Clipboard Copy**: The CLI automatically copies generated summaries to the system clipboard.
 - **Model Transparency & Duration**: The UI and CLI display which model produced the summary (e.g. `gemini-2.5-flash` or `ollama:gemma_temperature_zero:latest`) and how long the AI took to generate it.
 - **AI Output Humanization (texthumanize)**: Filters and humanizes AI-generated summaries using `texthumanize` to clean AI phrasing artifacts and normalize flow, with a user-toggleable checkbox that defaults to enabled and instant toggling between prefiltered and filtered outputs.

@@ -283,6 +283,129 @@ def test_api_summarize_humanizer_response():
             assert res.duration == 1.23
 
 
+def test_post_to_mastodon_and_open_in_browser():
+    from unittest.mock import patch, MagicMock
+    import mastodon_client
+
+    # 1. Credentials missing
+    with patch.multiple(mastodon_client, MASTODON_SERVER=None, MASTODON_CLIENT_KEY=None):
+        res = mastodon_client.post_to_mastodon("Summary", "https://example.com", open_in_browser=True)
+        assert res is None
+
+    # 2. Success with open_in_browser=False
+    with patch.multiple(
+        mastodon_client,
+        MASTODON_SERVER="https://mastodon.social",
+        MASTODON_CLIENT_KEY="key",
+        MASTODON_CLIENT_SECRET="secret",
+        MASTODON_ACCESS_TOKEN="token"
+    ):
+        with patch("mastodon_client.Mastodon") as mock_mastodon_cls, \
+             patch("mastodon_client.webbrowser.open") as mock_browser_open:
+            mock_instance = MagicMock()
+            mock_mastodon_cls.return_value = mock_instance
+            mock_instance.status_post.return_value = {
+                "id": 123456,
+                "url": "https://mastodon.social/@user/123456"
+            }
+
+            res = mastodon_client.post_to_mastodon("Summary text", "https://example.com", open_in_browser=False)
+            assert res is not None
+            assert res["url"] == "https://mastodon.social/@user/123456"
+            mock_instance.status_post.assert_called_once()
+            mock_browser_open.assert_not_called()
+
+        # 3. Success with open_in_browser=True
+        with patch("mastodon_client.Mastodon") as mock_mastodon_cls, \
+             patch("mastodon_client.webbrowser.open") as mock_browser_open:
+            mock_instance = MagicMock()
+            mock_mastodon_cls.return_value = mock_instance
+            mock_instance.status_post.return_value = {
+                "id": 123456,
+                "url": "https://mastodon.social/@user/123456"
+            }
+
+            res = mastodon_client.post_to_mastodon("Summary text", "https://example.com", open_in_browser=True)
+            assert res is not None
+            assert res["url"] == "https://mastodon.social/@user/123456"
+            mock_instance.status_post.assert_called_once()
+            mock_browser_open.assert_called_once_with("https://mastodon.social/@user/123456")
+
+        # 4. Exception in status_post returns None
+        with patch("mastodon_client.Mastodon") as mock_mastodon_cls, \
+             patch("mastodon_client.webbrowser.open") as mock_browser_open:
+            mock_instance = MagicMock()
+            mock_mastodon_cls.return_value = mock_instance
+            mock_instance.status_post.side_effect = Exception("API connection error")
+
+            res = mastodon_client.post_to_mastodon("Summary text", "https://example.com", open_in_browser=True)
+            assert res is None
+            mock_browser_open.assert_not_called()
+
+
+def test_api_mastodon_post_endpoint():
+    import asyncio
+    from unittest.mock import patch
+    import api
+    from api import PostMastodonRequest
+
+    with patch("api.post_to_mastodon") as mock_post:
+        mock_post.return_value = {"id": 999, "url": "https://mastodon.example/@bot/999"}
+        req = PostMastodonRequest(
+            summary="A short summary",
+            url="https://example.com/item",
+            open_in_browser=True
+        )
+        res = asyncio.run(api.mastodon_post(req))
+        assert res.success is True
+        assert res.post_url == "https://mastodon.example/@bot/999"
+        mock_post.assert_called_once_with(
+            "A short summary",
+            "https://example.com/item",
+            open_in_browser=True
+        )
+
+
+def test_cli_mastodon_browser_args():
+    import main
+
+    # Test parser flags
+    parser = main.argparse.ArgumentParser()
+    # Test through main argument parsing setup
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--mastodon", "-m", action="store_true")
+    p.add_argument("--open-mastodon", "-b", "--open-browser", action="store_true", dest="open_mastodon")
+
+    args1 = p.parse_args(["-m", "-b"])
+    assert args1.mastodon is True
+    assert args1.open_mastodon is True
+
+    args2 = p.parse_args(["--open-browser"])
+    assert args2.open_mastodon is True
+
+    args3 = p.parse_args(["--open-mastodon"])
+    assert args3.open_mastodon is True
+
+
+def test_extract_post_url():
+    import mastodon_client
+    from unittest.mock import patch
+
+    # 1. None status
+    assert mastodon_client.extract_post_url(None) is None
+
+    # 2. Dict with url
+    assert mastodon_client.extract_post_url({"url": "https://mastodon.social/@user/123"}) == "https://mastodon.social/@user/123"
+
+    # 3. Dict with uri fallback
+    assert mastodon_client.extract_post_url({"uri": "https://mastodon.social/users/user/statuses/123"}) == "https://mastodon.social/users/user/statuses/123"
+
+    # 4. Dict with non-http url/uri falls back to id and MASTODON_SERVER
+    with patch.object(mastodon_client, "MASTODON_SERVER", "https://mastodon.social"):
+        assert mastodon_client.extract_post_url({"id": "999"}) == "https://mastodon.social/web/statuses/999"
+
+
 def main_run():
     tests = [
         test_strip_invisible_unicode,
@@ -299,6 +422,10 @@ def main_run():
         test_generate_tldr_applies_ai_output_filter,
         test_generate_tldr_use_humanizer_toggle,
         test_api_summarize_humanizer_response,
+        test_post_to_mastodon_and_open_in_browser,
+        test_extract_post_url,
+        test_api_mastodon_post_endpoint,
+        test_cli_mastodon_browser_args,
     ]
     for t in tests:
         t()

@@ -11,6 +11,11 @@ export interface SummarizeResponse {
   duration?: number;
 }
 
+export interface PostMastodonResponse {
+  success: boolean;
+  post_url?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -42,7 +47,11 @@ export class ApiService {
     });
   }
 
-  postToMastodon(summary: string, url: string): Observable<{ success: boolean }> {
-    return this.http.post<{ success: boolean }>(`${this.apiUrl}/mastodon`, { summary, url });
+  postToMastodon(summary: string, url: string, openInBrowser: boolean = false): Observable<PostMastodonResponse> {
+    return this.http.post<PostMastodonResponse>(`${this.apiUrl}/mastodon`, { 
+      summary, 
+      url, 
+      open_in_browser: openInBrowser 
+    });
   }
 }

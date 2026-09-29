@@ -1,6 +1,7 @@
 import os
 import logging
-from typing import Optional
+import webbrowser
+from typing import Optional, Dict, Any
 from mastodon import Mastodon
 from dotenv import load_dotenv
 from content_filter import smart_truncate
@@ -12,11 +13,36 @@ MASTODON_CLIENT_KEY = os.getenv("MASTODON_CLIENT_KEY")
 MASTODON_CLIENT_SECRET = os.getenv("MASTODON_CLIENT_SECRET")
 MASTODON_ACCESS_TOKEN = os.getenv("MASTODON_ACCESS_TOKEN")
 
-def post_to_mastodon(text: str, url: str) -> bool:
-    """Posts the summary and URL to Mastodon."""
+def extract_post_url(status: Any) -> Optional[str]:
+    """Extracts the public web URL of a Mastodon status."""
+    if not status:
+        return None
+
+    url = None
+    if isinstance(status, dict):
+        url = status.get("url") or status.get("uri")
+    else:
+        url = getattr(status, "url", None) or getattr(status, "uri", None)
+
+    if url and str(url).startswith("http"):
+        return str(url)
+
+    status_id = status.get("id") if isinstance(status, dict) else getattr(status, "id", None)
+    if status_id and MASTODON_SERVER:
+        server = MASTODON_SERVER.rstrip("/")
+        return f"{server}/web/statuses/{status_id}"
+
+    return None
+
+def post_to_mastodon(text: str, url: str, open_in_browser: bool = False) -> Optional[Dict[str, Any]]:
+    """Posts the summary and URL to Mastodon.
+
+    If open_in_browser is True and posting succeeds, opens the post URL in the default browser.
+    Returns the status dict on success (truthy), or None on failure (falsy).
+    """
     if not all([MASTODON_SERVER, MASTODON_CLIENT_KEY, MASTODON_CLIENT_SECRET, MASTODON_ACCESS_TOKEN]):
         logging.error("Mastodon credentials missing in .env")
-        return False
+        return None
 
     try:
         mastodon = Mastodon(
@@ -50,9 +76,18 @@ def post_to_mastodon(text: str, url: str) -> bool:
         else:
             status_text = f"{text}{footer}"
         
-        mastodon.status_post(status_text)
+        status = mastodon.status_post(status_text)
         logging.info("Successfully posted to Mastodon.")
-        return True
+
+        post_url = extract_post_url(status)
+        if open_in_browser and post_url:
+            try:
+                webbrowser.open(post_url)
+                logging.info(f"Opened Mastodon post in browser: {post_url}")
+            except Exception as e:
+                logging.warning(f"Failed to open Mastodon post in browser: {e}")
+
+        return status
     except Exception as e:
         logging.error(f"Failed to post to Mastodon: {e}")
-        return False
+        return None

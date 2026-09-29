@@ -6,7 +6,7 @@ import logging
 import main
 from main import generate_tldr
 from scraper import ArticleScraper
-from mastodon_client import post_to_mastodon
+from mastodon_client import post_to_mastodon, extract_post_url
 
 app = FastAPI()
 
@@ -32,6 +32,11 @@ class SummarizeRequest(BaseModel):
 class PostMastodonRequest(BaseModel):
     summary: str
     url: str
+    open_in_browser: bool = False
+
+class PostMastodonResponse(BaseModel):
+    success: bool
+    post_url: Optional[str] = None
 
 class SummarizeResponse(BaseModel):
     summary: str
@@ -90,13 +95,14 @@ async def summarize(request: SummarizeRequest) -> SummarizeResponse:
         duration=main.LAST_GENERATION_DURATION,
     )
 
-@app.post("/api/mastodon")
-async def mastodon_post(request: PostMastodonRequest):
+@app.post("/api/mastodon", response_model=PostMastodonResponse)
+async def mastodon_post(request: PostMastodonRequest) -> PostMastodonResponse:
     logging.info(f"Received request to post to Mastodon: {request.url}")
-    success = post_to_mastodon(request.summary, request.url)
-    if not success:
+    status = post_to_mastodon(request.summary, request.url, open_in_browser=request.open_in_browser)
+    if not status:
         raise HTTPException(status_code=500, detail="Failed to post to Mastodon.")
-    return {"success": True}
+    post_url = extract_post_url(status)
+    return PostMastodonResponse(success=True, post_url=post_url)
 
 if __name__ == "__main__":
     import uvicorn

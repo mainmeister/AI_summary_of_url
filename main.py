@@ -326,6 +326,14 @@ def main() -> None:
     parser.add_argument("--sublime", "-s", action="store_true", help="Open the result in Sublime Text")
     parser.add_argument("--limit", "-l", type=int, default=500, help="Maximum character limit for the summary (default: 500)")
     parser.add_argument("--mastodon", "-m", action="store_true", help="Post the summary and URL to Mastodon")
+    parser.add_argument(
+        "--open-mastodon",
+        "-b",
+        "--open-browser",
+        action="store_true",
+        dest="open_mastodon",
+        help="Open the posted Mastodon item in the default browser",
+    )
     parser.add_argument("--force-ollama", "-o", action="store_true", help="Force using local Ollama model instead of Gemini")
     parser.add_argument("--no-strip-hidden", action="store_false", dest="strip_hidden", help="Disable stripping hidden HTML elements")
     parser.add_argument("--no-strip-unicode", action="store_false", dest="strip_unicode", help="Disable stripping invisible Unicode")
@@ -392,10 +400,15 @@ def main() -> None:
     if LAST_GENERATION_DURATION is not None:
         print(f"Time taken: {LAST_GENERATION_DURATION:.2f}s")
 
-    if args.mastodon:
+    if args.mastodon or args.open_mastodon:
         print("\n--- Posting to Mastodon...")
-        if post_to_mastodon(tldr, url):
-            print("Successfully posted to Mastodon!")
+        status = post_to_mastodon(tldr, url, open_in_browser=args.open_mastodon)
+        if status:
+            post_url = status.get("url") if isinstance(status, dict) else None
+            if post_url:
+                print(f"Successfully posted to Mastodon: {post_url}")
+            else:
+                print("Successfully posted to Mastodon!")
         else:
             print("Failed to post to Mastodon. Check logs for details.")
 

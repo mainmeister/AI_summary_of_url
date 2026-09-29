@@ -82,6 +82,10 @@ import { ApiService } from './api.service';
               <input type="checkbox" [(ngModel)]="forceOllama" [disabled]="loading"> Force Ollama
               <a href="https://ollama.com" target="_blank" title="Ollama" style="font-size: 12px; margin-left: 5px;">(?)</a>
             </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="openInBrowser" [disabled]="loading"> Open Mastodon Post
+              <a href="https://joinmastodon.org" target="_blank" title="Open posted Mastodon item in default browser" style="font-size: 12px; margin-left: 5px;">(?)</a>
+            </label>
           </div>
         </div>
 
@@ -112,6 +116,7 @@ import { ApiService } from './api.service';
           </div>
           <div *ngIf="mastodonSuccess !== null" class="mastodon-status-bar" [class.success]="mastodonSuccess" [class.failure]="!mastodonSuccess">
             {{ mastodonSuccess ? '✓ Successfully posted to Mastodon' : '✗ Failed to post to Mastodon' }}
+            <a *ngIf="mastodonSuccess && postUrl" [href]="postUrl" target="_blank" rel="noopener noreferrer" class="post-link">View Post</a>
           </div>
         </div>
       </main>
@@ -294,6 +299,12 @@ import { ApiService } from './api.service';
       color: #c0392b;
       background-color: #fdecea;
     }
+    .mastodon-status-bar .post-link {
+      margin-left: 10px;
+      color: #1e824c;
+      text-decoration: underline;
+      font-weight: 600;
+    }
     .error {
       color: #e74c3c;
       padding: 10px;
@@ -321,6 +332,7 @@ export class AppComponent implements AfterViewInit {
   stripQuery = true;
   useHumanizer = true;
   forceOllama = false;
+  openInBrowser = false;
   
   lastUrl = '';
   summary = '';
@@ -329,6 +341,7 @@ export class AppComponent implements AfterViewInit {
   model = '';
   duration: number | null = null;
   mastodonSuccess: boolean | null = null;
+  postUrl: string | null = null;
   loading = false;
   isPostingToMastodon = false;
   error = '';
@@ -359,6 +372,7 @@ export class AppComponent implements AfterViewInit {
     this.model = '';
     this.duration = null;
     this.mastodonSuccess = null;
+    this.postUrl = null;
     
     this.apiService.summarize(
       this.url, 
@@ -407,15 +421,31 @@ export class AppComponent implements AfterViewInit {
 
     this.isPostingToMastodon = true;
     this.mastodonSuccess = null;
+    this.postUrl = null;
 
-    this.apiService.postToMastodon(this.summary, this.lastUrl).subscribe({
-      next: () => {
+    // Open the tab client-side (the API server may have no display/browser).
+    // It must be opened synchronously within the click handler, otherwise
+    // popup blockers reject it; we navigate it once the post URL is known.
+    const postWindow = this.openInBrowser ? window.open('about:blank', '_blank') : null;
+
+    this.apiService.postToMastodon(this.summary, this.lastUrl, false).subscribe({
+      next: (res) => {
         this.mastodonSuccess = true;
         this.isPostingToMastodon = false;
+        this.postUrl = res.post_url || null;
+        if (postWindow) {
+          if (this.postUrl) {
+            postWindow.location.href = this.postUrl;
+          } else {
+            postWindow.close();
+          }
+        }
       },
       error: (err) => {
         this.mastodonSuccess = false;
         this.isPostingToMastodon = false;
+        this.postUrl = null;
+        postWindow?.close();
         console.error('Mastodon post failed:', err);
       }
     });

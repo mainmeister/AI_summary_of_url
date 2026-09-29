@@ -319,6 +319,13 @@ button:disabled {
   background-color: #eafaf1;
 }
 
+.mastodon-status-bar a {
+  margin-left: 8px;
+  color: #1e824c;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 .mastodon-status-bar.failure {
   color: #c0392b;
   background-color: #fdecea;

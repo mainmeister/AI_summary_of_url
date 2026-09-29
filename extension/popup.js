@@ -17,6 +17,7 @@ const usePytectorCheckbox = document.getElementById('usePytector');
 const stripQueryCheckbox = document.getElementById('stripQuery');
 const useHumanizerCheckbox = document.getElementById('useHumanizer');
 const forceOllamaCheckbox = document.getElementById('forceOllama');
+const openInBrowserCheckbox = document.getElementById('openInBrowser');
 
 const toggleServerConfigBtn = document.getElementById('toggleServerConfigBtn');
 const serverConfigPanel = document.getElementById('serverConfigPanel');
@@ -46,6 +47,7 @@ let filteredSummary = '';
 let currentModel = '';
 let currentDuration = null;
 let mastodonSuccess = null;
+let mastodonPostUrl = null;
 let isLoading = false;
 let isPostingToMastodon = false;
 
@@ -61,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery', 'forceOllama', 'useHumanizer']);
+      const data = await chrome.storage.sync.get(['apiUrl', 'limit', 'stripHidden', 'stripUnicode', 'usePytector', 'stripQuery', 'forceOllama', 'useHumanizer', 'openInBrowser']);
       if (data.apiUrl) apiUrl = data.apiUrl;
       if (data.limit !== undefined) limitInput.value = data.limit;
       if (data.stripHidden !== undefined) stripHiddenCheckbox.checked = data.stripHidden;
@@ -70,6 +72,7 @@ async function loadSettings() {
       if (data.stripQuery !== undefined) stripQueryCheckbox.checked = data.stripQuery;
       if (data.useHumanizer !== undefined) useHumanizerCheckbox.checked = data.useHumanizer;
       if (data.forceOllama !== undefined) forceOllamaCheckbox.checked = data.forceOllama;
+      if (data.openInBrowser !== undefined && openInBrowserCheckbox) openInBrowserCheckbox.checked = data.openInBrowser;
     } else if (window.localStorage) {
       const savedApiUrl = localStorage.getItem('tldr_api_url');
       if (savedApiUrl) apiUrl = savedApiUrl;
@@ -93,7 +96,8 @@ async function saveSettings() {
     usePytector: usePytectorCheckbox.checked,
     stripQuery: stripQueryCheckbox.checked,
     useHumanizer: useHumanizerCheckbox.checked,
-    forceOllama: forceOllamaCheckbox.checked
+    forceOllama: forceOllamaCheckbox.checked,
+    openInBrowser: openInBrowserCheckbox ? openInBrowserCheckbox.checked : false
   };
 
   try {
@@ -155,6 +159,9 @@ function setupEventListeners() {
     onHumanizerToggle();
   });
   forceOllamaCheckbox.addEventListener('change', () => saveSettings());
+  if (openInBrowserCheckbox) {
+    openInBrowserCheckbox.addEventListener('change', () => saveSettings());
+  }
 
   summarizeBtn.addEventListener('click', summarize);
   mastodonBtn.addEventListener('click', postToMastodon);
@@ -173,6 +180,29 @@ function setupEventListeners() {
     await saveSettings();
     serverConfigPanel.classList.add('hidden');
   });
+
+  // Ensure all links (help links and post links) open properly in Chrome tabs from the popup
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (link && link.href && (link.href.startsWith('http://') || link.href.startsWith('https://'))) {
+      e.preventDefault();
+      openUrlInBrowser(link.href);
+    }
+  });
+}
+
+function openUrlInBrowser(targetUrl) {
+  if (!targetUrl) return;
+  try {
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: targetUrl });
+    } else {
+      window.open(targetUrl, '_blank');
+    }
+  } catch (err) {
+    console.warn('Failed to open tab via chrome.tabs, falling back to window.open:', err);
+    window.open(targetUrl, '_blank');
+  }
 }
 
 function onHumanizerToggle() {
@@ -213,6 +243,7 @@ function updateUiState() {
   stripQueryCheckbox.disabled = isLoading;
   useHumanizerCheckbox.disabled = isLoading;
   forceOllamaCheckbox.disabled = isLoading;
+  if (openInBrowserCheckbox) openInBrowserCheckbox.disabled = isLoading;
 
   if (currentSummary) {
     resultContainer.classList.remove('hidden');
@@ -255,7 +286,11 @@ function updateUiState() {
       mastodonStatusBar.classList.remove('hidden');
       if (mastodonSuccess) {
         mastodonStatusBar.className = 'mastodon-status-bar success';
-        mastodonStatusBar.textContent = '✓ Successfully posted to Mastodon';
+        if (mastodonPostUrl) {
+          mastodonStatusBar.innerHTML = `✓ Successfully posted to Mastodon <a href="${mastodonPostUrl}" target="_blank" rel="noopener noreferrer">View Post</a>`;
+        } else {
+          mastodonStatusBar.textContent = '✓ Successfully posted to Mastodon';
+        }
       } else {
         mastodonStatusBar.className = 'mastodon-status-bar failure';
         mastodonStatusBar.textContent = '✗ Failed to post to Mastodon';
@@ -290,6 +325,7 @@ async function summarize() {
   currentModel = '';
   currentDuration = null;
   mastodonSuccess = null;
+  mastodonPostUrl = null;
   updateUiState();
 
   const payload = {
@@ -300,7 +336,7 @@ async function summarize() {
     use_pytector: usePytectorCheckbox.checked,
     strip_query: stripQueryCheckbox.checked,
     use_humanizer: useHumanizerCheckbox.checked,
-    force_ollama: forceOllamaCheckbox.checked
+    forceOllama: forceOllamaCheckbox.checked
   };
 
   try {
@@ -365,8 +401,11 @@ async function postToMastodon() {
 
   isPostingToMastodon = true;
   mastodonSuccess = null;
+  mastodonPostUrl = null;
   clearError();
   updateUiState();
+
+  const shouldOpen = openInBrowserCheckbox ? openInBrowserCheckbox.checked : false;
 
   try {
     const endpoint = `${apiUrl}/mastodon`;
@@ -377,12 +416,14 @@ async function postToMastodon() {
       },
       body: JSON.stringify({
         summary: textToPost,
-        url: lastUrl
+        url: lastUrl,
+        open_in_browser: false
       })
     });
 
     if (!response.ok) {
       mastodonSuccess = false;
+      mastodonPostUrl = null;
       let errorDetail = 'Failed to post to Mastodon.';
       try {
         const errJson = await response.json();
@@ -392,13 +433,20 @@ async function postToMastodon() {
       } catch (e) {
         errorDetail = `Mastodon post failed (${response.status}): ${response.statusText}`;
       }
-      console.error(errorDetail);
+      showError(errorDetail);
     } else {
+      const data = await response.json();
       mastodonSuccess = true;
+      mastodonPostUrl = data.post_url || null;
+      if (shouldOpen && mastodonPostUrl) {
+        openUrlInBrowser(mastodonPostUrl);
+      }
     }
   } catch (err) {
     console.error('Mastodon post request failed:', err);
     mastodonSuccess = false;
+    mastodonPostUrl = null;
+    showError(`Could not connect to API server at ${apiUrl}. Please ensure the backend is running.`);
   } finally {
     isPostingToMastodon = false;
     updateUiState();
@@ -410,6 +458,7 @@ function reloadPage() {
   currentModel = '';
   currentDuration = null;
   mastodonSuccess = null;
+  mastodonPostUrl = null;
   clearError();
   initActiveTabUrl();
   updateUiState();
