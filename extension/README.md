@@ -17,6 +17,28 @@ A Manifest V3 browser extension for Google Chrome (and Chromium-based browsers s
 - **Direct Mastodon Sharing**: Edit the summary text and post directly to your configured Mastodon instance.
 - **Configurable Server URL**: Easily adjust the backend API endpoint (default: `http://localhost:8000/api`) if running on custom ports or remote hosts.
 
+## Installation in Zen Browser / Firefox
+
+### Option A: Permanent Installation (.xpi)
+1. In Zen Browser, navigate to:
+   ```
+   about:addons
+   ```
+   (or press `Ctrl+Shift+A`).
+2. Click the gear icon (⚙) at the top of the Add-ons Manager.
+3. Select **Install Add-on From File...**.
+4. Select `tldr-url-bot@local.xpi` (available in this `extension/` directory or `~/Downloads/tldr-url-bot@local.xpi`).
+5. When prompted, click **Add**.
+
+### Option B: Development / Unpacked Mode
+1. In Zen Browser, navigate to:
+   ```
+   about:debugging#/runtime/this-firefox
+   ```
+2. Click **Load Temporary Add-on...**.
+3. Select `manifest.json` inside this `extension/` folder.
+4. The extension will load immediately.
+
 ## Installation in Chrome / Chromium
 
 1. Open your Chromium-based browser and navigate to:

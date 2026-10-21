@@ -29,5 +29,10 @@
     "http://127.0.0.1:8000/*",
     "http://*/*",
     "https://*/*"
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tldr-url-bot@local"
+    }
+  }
 }

@@ -336,7 +336,7 @@ async function summarize() {
     use_pytector: usePytectorCheckbox.checked,
     strip_query: stripQueryCheckbox.checked,
     use_humanizer: useHumanizerCheckbox.checked,
-    forceOllama: forceOllamaCheckbox.checked
+    force_ollama: forceOllamaCheckbox.checked
   };
 
   try {
